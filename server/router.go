@@ -22,7 +22,7 @@ func SetupRouter() *gin.Engine {
 	r.Use(gin.Recovery())
 
 	// 健康检查接口
-	r.GET("/health", healthCheck)
+	r.GET("/healthz", healthCheck)
 
 	// Prometheus指标接口
 	r.GET("/metrics", func(c *gin.Context) {
@@ -51,7 +51,7 @@ func SetupRouter() *gin.Engine {
 // @Accept json
 // @Produce json
 // @Success 200 {object} map[string]interface{}
-// @Router /health [get]
+// @Router /healthz [get]
 func healthCheck(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"status": "ok",

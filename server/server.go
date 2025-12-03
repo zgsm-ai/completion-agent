@@ -102,23 +102,15 @@ func (s *Server) Start() error {
 	return nil
 }
 
-/*
-*
-* 停止服务器
-* @returns {error} 返回服务器关闭过程中的错误，成功返回nil
-* @description
-* - 创建5秒超时的上下文
-* - 调用HTTP服务器的Shutdown方法进行优雅关闭
-* - 等待正在处理的请求完成或超时
-* - 用于主动停止服务器运行
-* @example
-* srv := NewServer(":8080", router)
-// 启动服务器...
-
-	if err := srv.Stop(); err != nil {
-	    log.Println("服务器停止失败:", err)
-	}
-*/
+/**
+ * 停止服务器
+ * @returns {error} 返回服务器关闭过程中的错误，成功返回nil
+ * @description
+ * - 创建5秒超时的上下文
+ * - 调用HTTP服务器的Shutdown方法进行优雅关闭
+ * - 等待正在处理的请求完成或超时
+ * - 用于主动停止服务器运行
+ */
 func (s *Server) Stop() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

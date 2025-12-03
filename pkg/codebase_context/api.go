@@ -27,7 +27,7 @@ type APIClient struct {
 func NewAPIClient() *APIClient {
 	return &APIClient{
 		client: &http.Client{
-			Timeout: config.Config().Context.RequestTimeout.Duration(),
+			Timeout: config.Context.RequestTimeout.Duration(),
 		},
 	}
 }

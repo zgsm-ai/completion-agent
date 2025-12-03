@@ -92,7 +92,7 @@ func (m *OpenAICompletion) Completions(ctx context.Context, p *CompletionParamet
 		return nil, StatusServerError, err
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, StatusModelError, fmt.Errorf("Invalid StatusCode(%d)", resp.StatusCode)
+		return nil, StatusModelError, fmt.Errorf("invalid StatusCode(%d)", resp.StatusCode)
 	}
 	var rsp CompletionResponse
 	if err := json.Unmarshal(body, &rsp); err != nil {

@@ -18,8 +18,6 @@ opt_arch = None
 opt_module = "github.com/zgsm-ai/{0}".format(opt_app)
 opt_output = None
 opt_cgo_enabled=0
-# if platform.system().lower() != "windows":
-#     opt_cgo_enabled=1
 
 def run_cmd(cmd):
     p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)

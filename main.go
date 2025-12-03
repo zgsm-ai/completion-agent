@@ -80,7 +80,8 @@ func main() {
 	if *mode == "release" {
 		gin.SetMode(gin.ReleaseMode)
 	}
-	logger.SetMode(*mode)
+	// 初始化日志系统
+	logger.InitLogger("", *mode, 50*1024*1024) // 默认路径，同步输出到控制台和文件，最大50MB
 	defer logger.Sync()
 
 	initConfig()
@@ -193,7 +194,7 @@ func setFixedOffset(tz string) {
  */
 func initModels() {
 	zap.L().Info("Initialize model instances")
-	if err := model.Init(config.Config().Models); err != nil {
+	if err := model.Init(config.Config.Models); err != nil {
 		panic(err)
 	}
 }
@@ -236,7 +237,7 @@ func initConfig() {
 	zap.L().Info("Fetch and load configures")
 	config.UpdateRemoteConfigs()
 	if err := config.LoadConfig(); err != nil {
-		logger.Fatal("加载.costrict/config/completion-config.json失败", zap.Error(err))
+		logger.Fatal("加载.costrict/config/completion-agent.json失败", zap.Error(err))
 		panic(err)
 	}
 }

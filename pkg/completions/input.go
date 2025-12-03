@@ -4,8 +4,8 @@ import (
 	"completion-agent/pkg/codebase_context"
 	"completion-agent/pkg/config"
 	"completion-agent/pkg/model"
+	"fmt"
 	"net/http"
-	"strings"
 	"time"
 )
 
@@ -28,7 +28,6 @@ type CompletionInput struct {
 	CompletionRequest               //原始请求中的BODY
 	Headers           http.Header   //原始请求中的头部
 	Processed         PromptOptions //加工过的提示词
-	SelectedModel     string        //根据服务端设置调整过的模型
 }
 
 /**
@@ -64,13 +63,14 @@ var contextClient *codebase_context.ContextClient
  */
 func (in *CompletionInput) Preprocess(c *CompletionContext) *CompletionResponse {
 	// 0. 补全拒绝规则链处理
-	err := NewFilterChain(&config.Config().Wrapper).Handle(&in.CompletionRequest)
+	err := NewFilterChain(config.Wrapper).Handle(in)
 	if err != nil {
-		c.Perf.TotalDuration = time.Since(c.Perf.ReceiveTime)
-		return RejectRequest(in, c.Perf, model.StatusRejected, err)
+		return CancelRequest(in.CompletionID, in.Model, c.Perf, model.StatusRejected, err)
 	}
 	// 1. 解析请求参数
-	in.GetPrompts()
+	if err := in.GetPrompts(); err != nil {
+		return CancelRequest(in.CompletionID, in.Model, c.Perf, model.StatusRejected, err)
+	}
 	// 2. 获取上下文信息
 	in.GetContext(c)
 	return nil
@@ -85,11 +85,6 @@ func (in *CompletionInput) Preprocess(c *CompletionContext) *CompletionResponse 
  * - 调用上下文客户端获取代码上下文
  * - 记录获取上下文的耗时
  * - 用于增强补全请求的上下文信息
- * @example
- * input := &CompletionInput{...}
- * ctx := NewCompletionContext(context.Background(), &CompletionPerformance{})
- * input.GetContext(ctx)
- * // 代码上下文信息已设置到input.Processed.CodeContext
  */
 func (in *CompletionInput) GetContext(c *CompletionContext) {
 	if in.Processed.CodeContext != "" {
@@ -101,14 +96,14 @@ func (in *CompletionInput) GetContext(c *CompletionContext) {
 	in.Processed.CodeContext = contextClient.GetContext(
 		c.Ctx,
 		in.ClientID,
-		in.ProjectPath,
-		in.FileProjectPath,
+		in.Processed.ProjectPath,
+		in.Processed.FileProjectPath,
 		in.Processed.Prefix,
 		in.Processed.Suffix,
-		in.ImportContent,
+		in.Processed.ImportContent,
 		in.Headers,
 	)
-	c.Perf.ContextDuration = time.Since(c.Perf.ReceiveTime)
+	c.Perf.ContextDuration = time.Since(c.Perf.ReceiveTime).Milliseconds()
 }
 
 /**
@@ -120,42 +115,11 @@ func (in *CompletionInput) GetContext(c *CompletionContext) {
  * - 如果行前缀为空，从前缀中提取最后一行
  * - 如果行后缀为空，从后缀中提取第一行
  * - 用于预处理补全请求的提示词
- * @example
- * input := &CompletionInput{
- *     CompletionRequest: CompletionRequest{
- *         Prompt: "function test() {\n",
- *     },
- * }
- * input.GetPrompts()
- * // input.Processed.Prefix = "function test() {\n"
- * // input.Processed.CursorLinePrefix = "function test() {"
  */
-func (in *CompletionInput) GetPrompts() {
-	req := &in.CompletionRequest
-	if req.Prompts != nil {
-		in.Processed = *req.Prompts
-	} else {
-		// 简单的提示词解析逻辑，参考Python代码
-		// 可以根据FIM_INDICATOR分割prompt来获取prefix和suffix
-		in.Processed.Prefix = req.Prompt
+func (in *CompletionInput) GetPrompts() error {
+	if in.Prompts == nil {
+		return fmt.Errorf("Missing 'prompt_options'")
 	}
-
-	// 如果linePrefix为空，从prefix中提取
-	if in.Processed.CursorLinePrefix == "" && in.Processed.Prefix != "" {
-		lines := strings.Split(in.Processed.Prefix, "\n")
-		if len(lines) > 0 {
-			in.Processed.CursorLinePrefix = lines[len(lines)-1]
-		}
-	}
-
-	// 如果lineSuffix为空，从suffix中提取
-	if in.Processed.CursorLineSuffix == "" && in.Processed.Suffix != "" {
-		lines := strings.Split(in.Processed.Suffix, "\n")
-		if len(lines) > 0 {
-			in.Processed.CursorLineSuffix = lines[0]
-			if len(lines) > 1 {
-				in.Processed.CursorLineSuffix += "\n"
-			}
-		}
-	}
+	in.Processed = *in.Prompts
+	return nil
 }

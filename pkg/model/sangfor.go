@@ -5,7 +5,6 @@ import (
 	"completion-agent/pkg/config"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 )
@@ -31,7 +30,7 @@ func (m *SangforCompletion) Completions(ctx context.Context, p *CompletionParame
 		return nil, StatusServerError, err
 	}
 
-	// 创建HTTP请求
+	// 创建HTTP请求, sangfor/v2接口
 	req, err := http.NewRequestWithContext(ctx, "POST", m.cfg.CompletionsUrl, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, StatusReqError, err
@@ -61,12 +60,9 @@ func (m *SangforCompletion) Completions(ctx context.Context, p *CompletionParame
 	if err != nil {
 		return nil, StatusServerError, err
 	}
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, StatusModelError, fmt.Errorf("Invalid StatusCode(%d)", resp.StatusCode)
-	}
 	var rsp CompletionResponse
 	if err := json.Unmarshal(body, &rsp); err != nil {
 		return nil, StatusServerError, err
 	}
-	return &rsp, StatusSuccess, nil
+	return &rsp, rsp.Status, nil
 }

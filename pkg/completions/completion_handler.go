@@ -16,9 +16,6 @@ import (
  * - 包含模型配置信息和LLM模型实例
  * - 提供补全请求的预处理和后处理功能
  * - 支持多种编程语言的代码补全
- * @example
- * handler := NewCompletionHandler(nil)
- * response := handler.HandleCompletion(ctx, input)
  */
 type CompletionHandler struct {
 	cfg *config.ModelConfig // 模型配置
@@ -89,8 +86,30 @@ func NewCompletionHandler(m model.LLM) *CompletionHandler {
 	}
 }
 
+func (h *CompletionHandler) Adapt(input *CompletionInput) *model.CompletionParameter {
+	// 3. 补全模型相关的前置处理 （拼接prompt策略，单行/多行补全策略，裁剪过长上下文）
+	h.truncatePrompt(h.cfg, &input.Processed)
+
+	// 4. 准备停用词，根据是否单行补全调整停用词
+	stopWords := h.prepareStopWords(input)
+
+	// 5. 交给模型处理
+	var para model.CompletionParameter
+	para.Model = input.Model
+	para.ClientID = input.ClientID
+	para.CompletionID = input.CompletionID
+	para.Language = input.LanguageID
+	para.Prefix = input.Processed.Prefix
+	para.Suffix = input.Processed.Suffix
+	para.CodeContext = input.Processed.CodeContext
+	para.Stop = stopWords
+	para.MaxTokens = h.cfg.MaxOutput
+	para.Temperature = float32(input.Temperature)
+	return &para
+}
+
 /**
- * 处理补全请求
+ * 调用大模型，处理补全请求
  * @param {*CompletionContext} c - 补全上下文，包含请求上下文和性能统计信息
  * @param {*CompletionInput} input - 补全输入，包含请求参数和预处理后的数据
  * @returns {*CompletionResponse} 返回补全响应对象，包含补全结果或错误信息
@@ -111,33 +130,20 @@ func NewCompletionHandler(m model.LLM) *CompletionHandler {
  * response := handler.CallLLM(ctx, input)
  */
 func (h *CompletionHandler) CallLLM(c *CompletionContext, input *CompletionInput) *CompletionResponse {
-	// 3. 补全模型相关的前置处理 （拼接prompt策略，单行/多行补全策略，裁剪过长上下文）
-	h.truncatePrompt(h.cfg, &input.Processed)
-
-	// 4. 准备停用词，根据是否单行补全调整停用词
-	stopWords := h.prepareStopWords(input)
-
-	// 5. 交给模型处理
-	var para model.CompletionParameter
-	para.Model = input.Model
-	para.ClientID = input.ClientID
-	para.CompletionID = input.CompletionID
-	para.Prefix = input.Processed.Prefix
-	para.Suffix = input.Processed.Suffix
-	para.CodeContext = input.Processed.CodeContext
-	para.Stop = stopWords
-	para.MaxTokens = h.cfg.MaxOutput
-	para.Temperature = float32(input.Temperature)
+	para := h.Adapt(input)
 
 	modelStartTime := time.Now().Local()
-	rsp, completionStatus, err := h.llm.Completions(c.Ctx, &para)
+	rsp, completionStatus, err := h.llm.Completions(c.Ctx, para)
 	modelEndTime := time.Now().Local()
-	c.Perf.LLMDuration = modelEndTime.Sub(modelStartTime)
+	c.Perf.LLMDuration = modelEndTime.Sub(modelStartTime).Milliseconds()
 
+	var verbose *model.CompletionVerbose
+	if rsp != nil {
+		verbose = rsp.Verbose
+	}
 	if completionStatus != model.StatusSuccess {
-		c.Perf.PromptTokens = h.getTokensCount(input.Processed.Prefix) + h.getTokensCount(input.Processed.CodeContext)
-		c.Perf.TotalDuration = time.Since(c.Perf.ReceiveTime)
-		return ErrorResponse(input, completionStatus, c.Perf, err)
+		c.Perf.PromptTokens = h.getTokensCount(para.Prefix) + h.getTokensCount(para.CodeContext)
+		return ErrorResponse(para.CompletionID, para.Model, completionStatus, c.Perf, verbose, err)
 	}
 
 	// 6. 补全后置处理
@@ -145,20 +151,21 @@ func (h *CompletionHandler) CallLLM(c *CompletionContext, input *CompletionInput
 	if len(rsp.Choices) > 0 {
 		completionText = rsp.Choices[0].Text
 	}
-	if completionText != "" && !config.Config().Wrapper.Prune.Disabled {
+	if completionText != "" && !config.Wrapper.Prune.Disabled {
 		completionText = h.pruneCompletionCode(completionText, para.Prefix, para.Suffix, input.LanguageID)
 	}
 	c.Perf.PromptTokens = rsp.Usage.PromptTokens
 	c.Perf.CompletionTokens = rsp.Usage.CompletionTokens
 	c.Perf.TotalTokens = c.Perf.CompletionTokens + c.Perf.PromptTokens
-	c.Perf.TotalDuration = time.Since(c.Perf.ReceiveTime)
 
 	if completionText == "" {
-		return ErrorResponse(input, model.StatusEmpty, c.Perf, fmt.Errorf("empty"))
+		return ErrorResponse(para.CompletionID, para.Model, model.StatusEmpty, c.Perf, verbose, fmt.Errorf("empty"))
 	}
-
 	// 7. 构建响应
-	return SuccessResponse(input, completionText, c.Perf)
+	if !para.Verbose {
+		verbose = nil
+	}
+	return SuccessResponse(para.CompletionID, para.Model, completionText, c.Perf, verbose)
 }
 
 /**

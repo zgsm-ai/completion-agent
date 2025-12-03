@@ -37,7 +37,7 @@ import (
  */
 type ModelConfig struct {
 	Provider       string   `json:"provider"`                // 模型供应商，代表着具体的模型接口/类型
-	ModelTitle     string   `json:"modelTitle"`              // 模型的标题，方便用户区分不同的模型来源
+	ModelTitle     string   `json:"modelTitle,omitempty"`    // 模型的标题，方便用户区分不同的模型来源
 	ModelName      string   `json:"modelName"`               // 真实的模型名称
 	CompletionsUrl string   `json:"completionsUrl"`          // 补全地址
 	Tags           []string `json:"tags"`                    // 模型标签，用户可以根据标签选择补全模型
@@ -187,12 +187,11 @@ type ScoreFilterConfig struct {
  * }
  */
 type SyntaxFilterConfig struct {
-	Disabled      bool    `json:"disabled"`      // 是否禁用语法过滤
-	Threshold     float64 `json:"threshold"`     // 过滤阈值分数
-	StrPattern    string  `json:"strPattern"`    // 字符串匹配模式
-	TreePattern   string  `json:"treePattern"`   // 语法树匹配模式
-	MinPromptLine int     `json:"minPromptLine"` // 触发补全的最少提示行数
-	EndTag        string  `json:"endTag"`        // 光标行结束标签
+	Disabled      bool   `json:"disabled"`      // 是否禁用语法过滤
+	StrPattern    string `json:"strPattern"`    // 字符串匹配模式
+	TreePattern   string `json:"treePattern"`   // 语法树匹配模式
+	MinPromptLine int    `json:"minPromptLine"` // 触发补全的最少提示行数
+	EndTag        string `json:"endTag"`        // 光标行结束标签
 }
 
 /**
@@ -417,7 +416,10 @@ func (d duration) Duration() time.Duration {
 	return d.dur
 }
 
-var cfg *SoftwareConfig
+// Must run config.LoadConfig() first
+var Config *SoftwareConfig
+var Context *ContextConfig
+var Wrapper *WrapperConfig
 
 /**
  * 获取costrict目录结构设定
@@ -493,36 +495,16 @@ func loadLocalConfig() (*SoftwareConfig, error) {
  * }
  */
 func LoadConfig() error {
-	if cfg != nil {
+	if Config != nil {
 		return nil
 	}
-	var err error
-	cfg, err = loadLocalConfig()
+	cfg, err := loadLocalConfig()
 	if err != nil {
 		log.Printf("Load failed: %v", err)
 		return err
 	}
+	Config = cfg
+	Context = &cfg.Context
+	Wrapper = &cfg.Wrapper
 	return nil
-}
-
-/**
- * 获取配置对象（单例模式）
- * @returns {*SoftwareConfig} 返回全局配置对象指针
- * @description
- * - 检查全局配置对象是否已初始化
- * - 如果未初始化，记录fatal日志并终止程序
- * - 返回全局配置对象
- * - 用于应用程序运行时获取配置信息
- * @throws
- * - 如果配置未初始化，会导致程序panic并退出
- * @example
- * cfg := Config()
- * models := cfg.Models
- */
-func Config() *SoftwareConfig {
-	if cfg == nil {
-		log.Fatalln("Must run config.LoadConfig() first")
-		return nil
-	}
-	return cfg
 }

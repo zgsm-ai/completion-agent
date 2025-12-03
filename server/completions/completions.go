@@ -20,14 +20,18 @@ import (
 // @Success 200 {object} completions.CompletionResponse
 // @Failure 400 {object} map[string]interface{}
 // @Failure 500 {object} map[string]interface{}
-// @Router /api/completions [post]
 // @Router /completion-agent/api/v1/completions [post]
 func Completions(c *gin.Context) {
 	var req completions.CompletionInput
 	if err := c.ShouldBindJSON(&req.CompletionRequest); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		zap.L().Error("Completions error", zap.Any("body", c.Request.Form), zap.Error(err))
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status": model.StatusReqError,
+			"error":  err.Error(),
+		})
 		return
 	}
+	zap.L().Info("Completions", zap.Any("req", &req))
 	req.Headers = c.Request.Header
 
 	handler := completions.NewCompletionHandler(nil)

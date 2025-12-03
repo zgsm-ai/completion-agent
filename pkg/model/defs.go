@@ -2,15 +2,17 @@ package model
 
 //	前置模块处理完毕后给到模型进行调用的参数信息
 type CompletionParameter struct {
-	CompletionID string   `json:"completionID"`
-	ClientID     string   `json:"clientID"`
-	Model        string   `json:"model"`
-	MaxTokens    int      `json:"max_tokens"`
-	Temperature  float32  `json:"temperature"`
-	Stop         []string `json:"stop"`
-	Prefix       string   `json:"prefix"`
-	Suffix       string   `json:"suffix"`
-	CodeContext  string   `json:"context"`
+	CompletionID string   `json:"completionID"` // 补全请求ID，用于唯一标识一次补全请求
+	ClientID     string   `json:"clientID"`     // 用户ID，唯一标识发起补全请求的用户
+	Language     string   `json:"language"`     // 编程语言
+	Model        string   `json:"model"`        // 模型
+	MaxTokens    int      `json:"max_tokens"`   // 回复内容的最大token数
+	Temperature  float32  `json:"temperature"`  // 温度
+	Stop         []string `json:"stop"`         // 停止符
+	Prefix       string   `json:"prefix"`       // 前缀
+	Suffix       string   `json:"suffix"`       // 后缀
+	CodeContext  string   `json:"context"`      // 上下文
+	Verbose      bool     `json:"verbose"`      // 是否需要更详细的回复，帮助调试
 }
 
 type CompletionVerbose struct {
@@ -75,4 +77,7 @@ type CompletionResponse struct {
 	Choices           []CompletionChoice `json:"choices"`
 	Usage             CompletionUsage    `json:"usage"`
 	SystemFingerprint string             `json:"system_fingerprint,omitempty"`
+	Status            CompletionStatus   `json:"status,omitempty"`  // Compatible with sangfor/v2
+	Error             string             `json:"error,omitempty"`   // Compatible with sangfor/v2
+	Verbose           *CompletionVerbose `json:"verbose,omitempty"` // Compatible with sangfor/v2
 }

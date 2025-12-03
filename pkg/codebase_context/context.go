@@ -157,7 +157,7 @@ func (c *ContextClient) RequestContext(ctx context.Context, clientID, codebasePa
 	}
 
 	// 创建上下文，设置超时
-	ctx, cancel := context.WithTimeout(ctx, config.Config().Context.TotalTimeout.Duration())
+	ctx, cancel := context.WithTimeout(ctx, config.Context.TotalTimeout.Duration())
 	defer cancel()
 
 	var wg sync.WaitGroup
@@ -167,7 +167,7 @@ func (c *ContextClient) RequestContext(ctx context.Context, clientID, codebasePa
 	semanticResults := make([]*ResponseData, len(queries))
 
 	// 定义检索
-	if len(codeSnippets) > 0 && !config.Config().Context.Definition.Disabled {
+	if len(codeSnippets) > 0 && !config.Context.Definition.Disabled {
 		for i, codeSnippet := range codeSnippets {
 			if codeSnippet == "" {
 				continue
@@ -177,7 +177,7 @@ func (c *ContextClient) RequestContext(ctx context.Context, clientID, codebasePa
 		}
 	}
 	// 调用链检索
-	if len(codeSnippets) > 0 && !config.Config().Context.Relation.Disabled {
+	if len(codeSnippets) > 0 && !config.Context.Relation.Disabled {
 		for i, codeSnippet := range codeSnippets {
 			if codeSnippet == "" {
 				continue
@@ -188,7 +188,7 @@ func (c *ContextClient) RequestContext(ctx context.Context, clientID, codebasePa
 	}
 
 	// 语义检索
-	if len(queries) > 0 && !config.Config().Context.Semantic.Disabled {
+	if len(queries) > 0 && !config.Context.Semantic.Disabled {
 		for i, query := range queries {
 			if query == "" {
 				continue
@@ -332,7 +332,7 @@ func (c *ContextClient) searchDefinition(ctx context.Context, clientID, codebase
 		CodeSnippet:  codeSnippet,
 	}
 
-	return c.apiClient.DoRequest(ctx, config.Config().Context.Definition.Url, params, headers, "GET")
+	return c.apiClient.DoRequest(ctx, config.Context.Definition.Url, params, headers, "GET")
 }
 
 /**
@@ -357,11 +357,11 @@ func (c *ContextClient) searchSemantic(ctx context.Context, clientID, codebasePa
 		ClientID:       clientID,
 		CodebasePath:   codebasePath,
 		Query:          query,
-		TopK:           config.Config().Context.Semantic.TopK,
-		ScoreThreshold: config.Config().Context.Semantic.ScoreThreshold,
+		TopK:           config.Context.Semantic.TopK,
+		ScoreThreshold: config.Context.Semantic.ScoreThreshold,
 	}
 
-	return c.apiClient.DoRequest(ctx, config.Config().Context.Semantic.Url, params, headers, "POST")
+	return c.apiClient.DoRequest(ctx, config.Context.Semantic.Url, params, headers, "POST")
 }
 
 /**
@@ -388,9 +388,9 @@ func (c *ContextClient) searchRelation(ctx context.Context, clientID, codebasePa
 		CodebasePath:   codebasePath,
 		FilePath:       filePath,
 		CodeSnippet:    codeSnippet,
-		MaxLayer:       config.Config().Context.Relation.Layer,
-		IncludeContent: config.Config().Context.Relation.IncludeContent,
+		MaxLayer:       config.Context.Relation.Layer,
+		IncludeContent: config.Context.Relation.IncludeContent,
 	}
 
-	return c.apiClient.DoRequest(ctx, config.Config().Context.Relation.Url, params, headers, "GET")
+	return c.apiClient.DoRequest(ctx, config.Context.Relation.Url, params, headers, "GET")
 }

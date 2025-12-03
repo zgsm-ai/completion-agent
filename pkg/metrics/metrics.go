@@ -3,7 +3,6 @@ package metrics
 import (
 	"net/http"
 	"sync"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -69,14 +68,14 @@ const (
 )
 
 // 记录补全各阶段耗时
-func RecordCompletionDuration(model string, status string, queue, context, llm, total time.Duration) {
+func RecordCompletionDuration(model string, status string, queue, context, llm, total int64) {
 	metricsMutex.Lock()
 	defer metricsMutex.Unlock()
 
-	completionDurations.WithLabelValues(model, status, "queue").Observe(float64(queue.Milliseconds()))
-	completionDurations.WithLabelValues(model, status, "context").Observe(float64(context.Milliseconds()))
-	completionDurations.WithLabelValues(model, status, "llm").Observe(float64(llm.Milliseconds()))
-	completionDurations.WithLabelValues(model, status, "total").Observe(float64(total.Milliseconds()))
+	completionDurations.WithLabelValues(model, status, "queue").Observe(float64(queue))
+	completionDurations.WithLabelValues(model, status, "context").Observe(float64(context))
+	completionDurations.WithLabelValues(model, status, "llm").Observe(float64(llm))
+	completionDurations.WithLabelValues(model, status, "total").Observe(float64(total))
 }
 
 // 记录每次请求的输入和输出token数分布

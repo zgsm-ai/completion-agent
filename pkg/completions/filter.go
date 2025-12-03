@@ -27,7 +27,7 @@ const (
 
 // 补全过滤器接口
 type Filter interface {
-	Judge(data *CompletionRequest) RejectCode
+	Judge(in *CompletionInput) RejectCode
 }
 
 // 补全拒绝规则链
@@ -69,7 +69,7 @@ func NewFilterChain(cfg *config.WrapperConfig) *FilterChain {
 
 /**
  * Handle completion request through filter chain
- * @param {CompletionRequest} data - Completion request data to be evaluated
+ * @param {CompletionInput} in - Completion request data to be evaluated
  * @returns {error} Returns error if any filter rejects the request, nil if all filters accept
  * @description
  * - Processes completion request through all filters in the chain
@@ -82,9 +82,9 @@ func NewFilterChain(cfg *config.WrapperConfig) *FilterChain {
  *     log.Printf("Request rejected: %v", err)
  * }
  */
-func (c *FilterChain) Handle(data *CompletionRequest) error {
+func (c *FilterChain) Handle(in *CompletionInput) error {
 	for _, handler := range c.filters {
-		if rejectCode := handler.Judge(data); rejectCode != Accepted {
+		if rejectCode := handler.Judge(in); rejectCode != Accepted {
 			return fmt.Errorf("%s", rejectCode)
 		}
 	}
@@ -144,7 +144,6 @@ func NewSyntaxFilter(cfg *config.SyntaxFilterConfig) *CodeFilters {
 
 /**
  * Create code filters for completion request evaluation
- * @param {float64} thresholdScore - Threshold score for filtering
  * @param {int} MinPromptLine - Minimum line count threshold
  * @param {string} strPattern - String pattern for code analysis
  * @param {string} treePattern - Tree pattern for code analysis
@@ -170,7 +169,7 @@ func NewCodeFilters(minPromptLine int, strPattern, treePattern, endTag string) *
 
 /**
  * Determine if code completion is needed for the request
- * @param {CompletionRequest} data - Completion request data containing code context
+ * @param {CompletionInput} in - Completion request data containing code context
  * @returns {bool} Returns true if code completion is needed, false otherwise
  * @description
  * - Checks if cursor is at the end of line (no completion needed)
@@ -182,17 +181,17 @@ func NewCodeFilters(minPromptLine int, strPattern, treePattern, endTag string) *
  *     // Process code completion
  * }
  */
-func (c *CodeFilters) Judge(data *CompletionRequest) RejectCode {
+func (c *CodeFilters) Judge(in *CompletionInput) RejectCode {
 	// 跳过手动触发模式
-	mode := strings.ToUpper(data.TriggerMode)
+	mode := strings.ToUpper(in.TriggerMode)
 	if mode == "MANUAL" || mode == "CONTINUE" {
 		return Accepted
 	}
-	if c.cursorIsAtTheEnd(data) {
+	if c.cursorIsAtTheEnd(in) {
 		return FeatureNotSupport
 	}
 
-	if c.textAfterFillHereStartWithWord(data) {
+	if c.textAfterFillHereStartWithWord(in) {
 		return FeatureNotSupport
 	}
 	// 简化实现，其他复杂的过滤逻辑暂时关闭
@@ -201,19 +200,19 @@ func (c *CodeFilters) Judge(data *CompletionRequest) RejectCode {
 	return Accepted
 }
 
-func (c *CodeFilters) NeedCode(data *CompletionRequest) bool {
+func (c *CodeFilters) NeedCode(in *CompletionInput) bool {
 	// 是否需要触发模型进行自动补全编码
 
 	// 暂时关闭，参考相关文档
-	// if c.tooFewLines(data) {
+	// if c.tooFewLines(in) {
 	//     return false
 	// }
 
-	if c.cursorIsAtTheEnd(data) {
+	if c.cursorIsAtTheEnd(in) {
 		return false
 	}
 
-	if c.textAfterFillHereStartWithWord(data) {
+	if c.textAfterFillHereStartWithWord(in) {
 		return false
 	}
 
@@ -251,7 +250,7 @@ func (c *CodeFilters) splitPrompt(prompt string) (string, string) {
 
 /**
  * Check if cursor is at the end of a line
- * @param {CompletionRequest} data - Completion request data containing prompt
+ * @param {CompletionInput} in - Completion request data containing prompt
  * @returns {bool} Returns true if cursor is at line end, false otherwise
  * @description
  * - Splits prompt into text before and after cursor
@@ -264,11 +263,11 @@ func (c *CodeFilters) splitPrompt(prompt string) (string, string) {
  *     // Skip completion
  * }
  */
-func (c *CodeFilters) cursorIsAtTheEnd(data *CompletionRequest) bool {
+func (c *CodeFilters) cursorIsAtTheEnd(in *CompletionInput) bool {
 	// 光标位于有效行行尾的直接不触发补全
 	// 行尾定义：光标左侧是'>'、';'、'}'、')'，右侧是换行符号
 
-	textBeforeCursor, textAfterCursor := c.splitPrompt(data.Prompt)
+	textBeforeCursor, textAfterCursor := c.splitPrompt(in.Processed.Prefix)
 	if textBeforeCursor != "" && textAfterCursor != "" {
 		// 解析endTag
 		endTags := c.parseEndTag()
@@ -319,7 +318,7 @@ func (c *CodeFilters) parseEndTag() []string {
 
 /**
  * Check if text after fill position starts with a word character
- * @param {CompletionRequest} data - Completion request data containing prompt
+ * @param {CompletionInput} in - Completion request data containing prompt
  * @returns {bool} Returns true if text after fill starts with word character, false otherwise
  * @description
  * - Extracts text after cursor position from prompt
@@ -331,9 +330,9 @@ func (c *CodeFilters) parseEndTag() []string {
  *     // Skip completion (likely variable name modification)
  * }
  */
-func (c *CodeFilters) textAfterFillHereStartWithWord(data *CompletionRequest) bool {
+func (c *CodeFilters) textAfterFillHereStartWithWord(in *CompletionInput) bool {
 	// 补全后面直接是英文字母开头或数字的不补全，比如修改变量名称的场景
-	_, textAfterCursor := c.splitPrompt(data.Prompt)
+	_, textAfterCursor := c.splitPrompt(in.Processed.Prefix)
 	if textAfterCursor != "" {
 		firstChar := textAfterCursor[0]
 		if (firstChar >= 'a' && firstChar <= 'z') || (firstChar >= 'A' && firstChar <= 'Z') || (firstChar >= '0' && firstChar <= '9') {
@@ -346,7 +345,7 @@ func (c *CodeFilters) textAfterFillHereStartWithWord(data *CompletionRequest) bo
 
 /**
  * Check if prompt contains too few lines for completion
- * @param {CompletionRequest} data - Completion request data containing prompt
+ * @param {CompletionInput} in - Completion request data containing prompt
  * @returns {bool} Returns true if prompt has too few lines, false otherwise
  * @description
  * - Splits prompt into individual lines
@@ -359,9 +358,9 @@ func (c *CodeFilters) textAfterFillHereStartWithWord(data *CompletionRequest) bo
  *     // Skip completion (insufficient context)
  * }
  */
-func (c *CodeFilters) tooFewLines(data *CompletionRequest) bool {
+func (c *CodeFilters) tooFewLines(in *CompletionInput) bool {
 	// prompt行数太少不触发补全，排除空行场景
-	lines := strings.Split(data.Prompt, "\n")
+	lines := strings.Split(in.Processed.Prefix, "\n")
 	nonEmptyLines := make([]string, 0)
 	for _, line := range lines {
 		if strings.TrimSpace(line) != "" {
@@ -416,7 +415,7 @@ func NewScoreFilter(cfg *config.ScoreFilterConfig) *HiddenScoreFilter {
 
 /**
  * Judge if completion request should be accepted based on hidden score
- * @param {CompletionRequest} data - Completion request data with score calculation info
+ * @param {CompletionInput} in - Completion request data with score calculation info
  * @returns {RejectCode} Returns AcceptCode if score is above threshold, LowHiddenScore otherwise
  * @description
  * - Skips filtering for manual and continue trigger modes (always accepts)
@@ -430,31 +429,28 @@ func NewScoreFilter(cfg *config.ScoreFilterConfig) *HiddenScoreFilter {
  *     log.Printf("Completion rejected due to low score")
  * }
  */
-func (h *HiddenScoreFilter) Judge(data *CompletionRequest) RejectCode {
+func (h *HiddenScoreFilter) Judge(in *CompletionInput) RejectCode {
 	// 跳过手动触发和继续补全模式
-	mode := strings.ToUpper(data.TriggerMode)
+	mode := strings.ToUpper(in.TriggerMode)
 	if mode == "MANUAL" || mode == "CONTINUE" {
 		return Accepted
 	}
 
 	// 计算隐藏分数
-	if data.HideScores == nil {
+	if in.HideScores == nil {
 		return Accepted
 	}
 
 	score := 0.0
-	if data.HideScores.DocumentLength != 0 {
-		if data.Prompts != nil {
-			data.HideScores.Prefix = data.Prompts.Prefix
-		}
-		score = h.CalculateHideScore(data.HideScores, data.LanguageID)
+	if in.HideScores.DocumentLength != 0 {
+		score = h.CalculateHideScore(in.HideScores, in.Processed.Prefix, in.LanguageID)
 	}
 
 	// 将分数更新到请求数据中（问题4修复）
-	if data.Extra == nil {
-		data.Extra = make(map[string]interface{})
+	if in.Extra == nil {
+		in.Extra = make(map[string]interface{})
 	}
-	data.Extra["score"] = score
+	in.Extra["score"] = score
 
 	// 通过配置阈值来过滤隐藏分低的补全
 	if score < h.ThresholdScore {
@@ -462,8 +458,8 @@ func (h *HiddenScoreFilter) Judge(data *CompletionRequest) RejectCode {
 		logger.Debug("低隐藏分数拒绝补全",
 			zap.Float64("score", score),
 			zap.Float64("threshold", h.ThresholdScore),
-			zap.String("completion_id", data.CompletionID),
-			zap.String("language", data.LanguageID))
+			zap.String("completion_id", in.CompletionID),
+			zap.String("language", in.LanguageID))
 		return LowHiddenScore
 	}
 
@@ -494,7 +490,7 @@ func loadHiddenScoreFilter(configPath string) *HiddenScoreFilter {
  * - Uses default threshold of 0.3 if not provided
  * @example
  * config := NewHiddenScoreFilter("config.yml", 0.3)
- * score := config.CalculateHideScore(request, "python")
+ * score := config.CalculateHideScore(request, prefix, "python")
  */
 func NewHiddenScoreFilter(configPath string, thresholdScore float64) *HiddenScoreFilter {
 	if thresholdScore == 0.0 {
@@ -549,12 +545,12 @@ func NewHiddenScoreFilter(configPath string, thresholdScore float64) *HiddenScor
  * - Applies language-specific weights and character-specific weights
  * - Uses logistic function to convert weighted sum to probability
  * @example
- * score := filter.CalculateHideScore(request, "python")
+ * score := filter.CalculateHideScore(request, prefix, "python")
  * if score < 0.3 {
  *     // Reject completion
  * }
  */
-func (h *HiddenScoreFilter) CalculateHideScore(scores *HiddenScoreOptions, language string) float64 {
+func (h *HiddenScoreFilter) CalculateHideScore(scores *HiddenScoreOptions, prefix, language string) float64 {
 	// 判断光标权重
 	whitespaceAfterCursor := 0.0
 	if scores.IsWhitespaceAfterCursor {
@@ -569,7 +565,7 @@ func (h *HiddenScoreFilter) CalculateHideScore(scores *HiddenScoreOptions, langu
 
 	prefixLengthLog := 0.0
 	prefixLastCharWeight := 0
-	prefixStr := scores.Prefix
+	prefixStr := prefix
 
 	if prefixStr != "" {
 		prefixLengthLog = math.Log(1.0 + float64(h.getLastLineLength(prefixStr)))

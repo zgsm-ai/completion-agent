@@ -27,7 +27,7 @@ func NewSimpleParser(language string) Parser {
 }
 
 /**
- * 检查代码语法（Windows平台简化实现）
+ * 检查代码语法（简化实现）
  * @param {string} code - 需要检查语法的代码字符串
  * @returns {boolean} 返回代码语法是否正确，true表示语法正确，false表示语法错误
  * @description
@@ -41,11 +41,20 @@ func NewSimpleParser(language string) Parser {
  * // isValid = true
  */
 func (t *SimpleParser) IsCodeSyntax(code string) bool {
-	return t.basicSyntaxCheck(code)
+	switch strings.ToLower(t.language) {
+	case "python":
+		return t.checkPythonSyntax(code)
+	case "javascript", "typescript":
+		return t.checkJavaScriptSyntax(code)
+	case "go":
+		return t.checkGoSyntax(code)
+	default:
+		return true // 对于不支持的语言，默认返回true
+	}
 }
 
 /**
- * 拦截语法错误代码（Windows平台简化实现）
+ * 拦截语法错误代码（简化实现）
  * @param {string} choicesText - 候选文本内容，需要从中提取有效代码
  * @param {string} prefix - 代码前缀，用于语法检查的上下文
  * @param {string} suffix - 代码后缀，用于语法检查的上下文
@@ -84,7 +93,7 @@ func (t *SimpleParser) InterceptSyntaxErrorCode(choicesText, prefix, suffix stri
 }
 
 /**
- * 提取代码块前后缀（Windows平台简化实现）
+ * 提取代码块前后缀（简化实现）
  * @param {string} choicesText - 候选文本内容，用于提取前后缀
  * @param {string} prefix - 代码前缀，用于提取上下文
  * @param {string} suffix - 代码后缀，用于提取上下文
@@ -99,11 +108,24 @@ func (t *SimpleParser) InterceptSyntaxErrorCode(choicesText, prefix, suffix stri
  * prefix, suffix := parser.ExtractBlockPrefixSuffix("code", "def main():", "\nreturn")
  */
 func (t *SimpleParser) ExtractBlockPrefixSuffix(choicesText, prefix, suffix string) (string, string) {
-	return t.extractSimpleBlockPrefixSuffix(choicesText, prefix, suffix)
+	const specialMiddleSignal = "<special-middle>"
+	code := prefix + specialMiddleSignal + choicesText + specialMiddleSignal + suffix
+
+	startNumber, endNumber := getChoicesTextLineNumber(code, specialMiddleSignal)
+
+	// 简化实现：基于行号提取代码块
+	lines := strings.Split(code, "\n")
+	if startNumber >= 0 && startNumber < len(lines) && endNumber >= 0 && endNumber < len(lines) {
+		blockLines := lines[startNumber : endNumber+1]
+		blockCode := strings.Join(blockLines, "\n")
+		return isolatedPrefixSuffix(blockCode, specialMiddleSignal)
+	}
+
+	return prefix, suffix
 }
 
 /**
- * 提取准确的代码块前后缀（Windows平台简化实现）
+ * 提取准确的代码块前后缀（简化实现）
  * @param {string} prefix - 代码前缀，用于提取上下文
  * @param {string} suffix - 代码后缀，用于提取上下文
  * @returns {string, string} 返回提取的前缀和后缀字符串
@@ -137,7 +159,7 @@ func (t *SimpleParser) ExtractAccurateBlockPrefixSuffix(prefix, suffix string) (
 }
 
 /**
- * 查找最近的代码块（Windows平台简化实现）
+ * 查找最近的代码块（简化实现）
  * @param {string} code - 完整的代码字符串，用于查找代码块
  * @param {int} startNumber - 起始行号，用于指定代码块的起始位置
  * @param {int} endNumber - 结束行号，用于指定代码块的结束位置
@@ -153,11 +175,16 @@ func (t *SimpleParser) ExtractAccurateBlockPrefixSuffix(prefix, suffix string) (
  * // block = "line1\nline2"
  */
 func (t *SimpleParser) FindNearestBlock(code string, startNumber, endNumber int) string {
-	return t.findNearestBlockSimple(code, startNumber, endNumber)
+	lines := strings.Split(code, "\n")
+	if startNumber >= 0 && startNumber < len(lines) && endNumber >= 0 && endNumber < len(lines) {
+		blockLines := lines[startNumber : endNumber+1]
+		return strings.Join(blockLines, "\n")
+	}
+	return code
 }
 
 /**
- * 按行号查找第二层节点（Windows平台简化实现）
+ * 按行号查找第二层节点（简化实现）
  * @param {string} code - 完整的代码字符串，用于查找节点
  * @param {int} lineNum - 行号，用于指定要查找的节点位置
  * @returns {string} 返回找到的节点内容字符串
@@ -172,11 +199,15 @@ func (t *SimpleParser) FindNearestBlock(code string, startNumber, endNumber int)
  * // node = "line2"
  */
 func (t *SimpleParser) FindSecondLevelNodeByLineNum(code string, lineNum int) string {
-	return t.findSecondLevelNodeByLineNumSimple(code, lineNum)
+	lines := strings.Split(code, "\n")
+	if lineNum >= 0 && lineNum < len(lines) {
+		return lines[lineNum]
+	}
+	return ""
 }
 
 /**
- * 查找指定行号的最近节点（Windows平台简化实现）
+ * 查找指定行号的最近节点（简化实现）
  * @param {string} code - 完整的代码字符串，用于查找节点
  * @param {int} lineNum - 行号，用于指定要查找的节点位置
  * @returns {string, string} 返回前缀节点和后缀节点字符串
@@ -191,11 +222,19 @@ func (t *SimpleParser) FindSecondLevelNodeByLineNum(code string, lineNum int) st
  * // prefix = "line1", suffix = "line3"
  */
 func (t *SimpleParser) FindSecondLevelNearestNodeByLineNum(code string, lineNum int) (string, string) {
-	return t.findSecondLevelNearestNodeByLineNumSimple(code, lineNum)
+	lines := strings.Split(code, "\n")
+	var prefixNode, suffixNode string
+
+	if lineNum > 0 && lineNum < len(lines) {
+		prefixNode = strings.Join(lines[:lineNum], "\n")
+		suffixNode = strings.Join(lines[lineNum+1:], "\n")
+	}
+
+	return prefixNode, suffixNode
 }
 
 /**
- * 获取代码最后k行字符串长度（Windows平台简化实现）
+ * 获取代码最后k行字符串长度（简化实现）
  * @param {string} code - 完整的代码字符串，用于计算长度
  * @param {int} k - 要计算的行数，从最后一行开始计算
  * @returns {int} 返回最后k行字符串的总长度，包括换行符
@@ -234,34 +273,7 @@ func (t *SimpleParser) GetLastKLineStrLen(code string, k int) int {
 }
 
 /**
- * 基本的语法检查（Windows平台简化实现）
- * @param {string} code - 需要检查语法的代码字符串
- * @returns {boolean} 返回代码语法是否正确，true表示语法正确，false表示语法错误
- * @description
- * - 根据分析器设置的语言类型调用相应的语法检查函数
- * - 支持Python、JavaScript/TypeScript、Go语言的语法检查
- * - 对于不支持的语言默认返回true
- * - 内部方法，供IsCodeSyntax调用
- * @example
- * parser := NewSimpleParser("python")
- * isValid := parser.basicSyntaxCheck("print('Hello World')")
- * // isValid = true
- */
-func (t *SimpleParser) basicSyntaxCheck(code string) bool {
-	switch strings.ToLower(t.language) {
-	case "python":
-		return t.checkPythonSyntax(code)
-	case "javascript", "typescript":
-		return t.checkJavaScriptSyntax(code)
-	case "go":
-		return t.checkGoSyntax(code)
-	default:
-		return true // 对于不支持的语言，默认返回true
-	}
-}
-
-/**
- * 检查Python语法（Windows平台简化实现）
+ * 检查Python语法（简化实现）
  * @param {string} code - 需要检查语法的Python代码字符串
  * @returns {boolean} 返回Python代码语法是否正确，true表示语法正确，false表示语法错误
  * @description
@@ -313,7 +325,7 @@ func (t *SimpleParser) checkPythonSyntax(code string) bool {
 }
 
 /**
- * 检查JavaScript语法（Windows平台简化实现）
+ * 检查JavaScript语法（简化实现）
  * @param {string} code - 需要检查语法的JavaScript代码字符串
  * @returns {boolean} 返回JavaScript代码语法是否正确，true表示语法正确，false表示语法错误
  * @description
@@ -361,7 +373,7 @@ func (t *SimpleParser) checkJavaScriptSyntax(code string) bool {
 }
 
 /**
- * 检查Go语法（Windows平台简化实现）
+ * 检查Go语法（简化实现）
  * @param {string} code - 需要检查语法的Go代码字符串
  * @returns {boolean} 返回Go代码语法是否正确，true表示语法正确，false表示语法错误
  * @description
@@ -406,114 +418,6 @@ func (t *SimpleParser) checkGoSyntax(code string) bool {
 	}
 
 	return bracketCount == 0 && parenCount == 0 && bracketSquareCount == 0
-}
-
-/**
- * 简化的代码块查找
- * @param {string} code - 完整的代码字符串，用于查找代码块
- * @param {int} startNumber - 起始行号，用于指定代码块的起始位置
- * @param {int} endNumber - 结束行号，用于指定代码块的结束位置
- * @returns {string} 返回找到的代码块字符串
- * @description
- * - 根据指定的行号范围提取代码块
- * - 简化实现，直接按行号截取代码
- * - 如果行号超出范围，返回完整代码
- * - 内部方法，供FindNearestBlock调用
- * @example
- * parser := NewSimpleParser("python")
- * block := parser.findNearestBlockSimple("line1\nline2\nline3", 0, 1)
- * // block = "line1\nline2"
- */
-func (t *SimpleParser) findNearestBlockSimple(code string, startNumber, endNumber int) string {
-	lines := strings.Split(code, "\n")
-	if startNumber >= 0 && startNumber < len(lines) && endNumber >= 0 && endNumber < len(lines) {
-		blockLines := lines[startNumber : endNumber+1]
-		return strings.Join(blockLines, "\n")
-	}
-	return code
-}
-
-/**
- * 简化的第二层节点查找
- * @param {string} code - 完整的代码字符串，用于查找节点
- * @param {int} lineNum - 行号，用于指定要查找的节点位置
- * @returns {string} 返回找到的节点内容字符串
- * @description
- * - 根据指定的行号查找对应的代码节点
- * - 简化实现，直接返回指定行的内容
- * - 如果行号超出范围，返回空字符串
- * - 内部方法，供FindSecondLevelNodeByLineNum调用
- * @example
- * parser := NewSimpleParser("python")
- * node := parser.findSecondLevelNodeByLineNumSimple("line1\nline2\nline3", 1)
- * // node = "line2"
- */
-func (t *SimpleParser) findSecondLevelNodeByLineNumSimple(code string, lineNum int) string {
-	lines := strings.Split(code, "\n")
-	if lineNum >= 0 && lineNum < len(lines) {
-		return lines[lineNum]
-	}
-	return ""
-}
-
-/**
- * 简化的最近节点查找
- * @param {string} code - 完整的代码字符串，用于查找节点
- * @param {int} lineNum - 行号，用于指定要查找的节点位置
- * @returns {string, string} 返回前缀节点和后缀节点字符串
- * @description
- * - 根据指定的行号分割代码，获取前后节点
- * - 前缀节点包含指定行号之前的所有代码
- * - 后缀节点包含指定行号之后的所有代码
- * - 内部方法，供FindSecondLevelNearestNodeByLineNum调用
- * @example
- * parser := NewSimpleParser("python")
- * prefix, suffix := parser.findSecondLevelNearestNodeByLineNumSimple("line1\nline2\nline3", 1)
- * // prefix = "line1", suffix = "line3"
- */
-func (t *SimpleParser) findSecondLevelNearestNodeByLineNumSimple(code string, lineNum int) (string, string) {
-	lines := strings.Split(code, "\n")
-	var prefixNode, suffixNode string
-
-	if lineNum > 0 && lineNum < len(lines) {
-		prefixNode = strings.Join(lines[:lineNum], "\n")
-		suffixNode = strings.Join(lines[lineNum+1:], "\n")
-	}
-
-	return prefixNode, suffixNode
-}
-
-/**
- * 简化的代码块前后缀提取
- * @param {string} choicesText - 候选文本内容，用于提取前后缀
- * @param {string} prefix - 代码前缀，用于提取上下文
- * @param {string} suffix - 代码后缀，用于提取上下文
- * @returns {string, string} 返回提取的前缀和后缀字符串
- * @description
- * - 从候选文本中提取有效的代码块前后缀
- * - 使用特殊标记符来识别代码块边界
- * - 简化实现，基于行号提取代码块
- * - 如果提取失败，返回原始前缀和后缀
- * - 内部方法，供ExtractBlockPrefixSuffix调用
- * @example
- * parser := NewSimpleParser("python")
- * prefix, suffix := parser.extractSimpleBlockPrefixSuffix("code", "def main():", "\nreturn")
- */
-func (t *SimpleParser) extractSimpleBlockPrefixSuffix(choicesText, prefix, suffix string) (string, string) {
-	const specialMiddleSignal = "<special-middle>"
-	code := prefix + specialMiddleSignal + choicesText + specialMiddleSignal + suffix
-
-	startNumber, endNumber := getChoicesTextLineNumber(code, specialMiddleSignal)
-
-	// 简化实现：基于行号提取代码块
-	lines := strings.Split(code, "\n")
-	if startNumber >= 0 && startNumber < len(lines) && endNumber >= 0 && endNumber < len(lines) {
-		blockLines := lines[startNumber : endNumber+1]
-		blockCode := strings.Join(blockLines, "\n")
-		return isolatedPrefixSuffix(blockCode, specialMiddleSignal)
-	}
-
-	return prefix, suffix
 }
 
 /**
