@@ -27,16 +27,16 @@ const (
 )
 
 const (
-	DiscardExtremeRepetition string = "discard-extreme_repetition"
-	DiscardNotMatchLanguage  string = "discard-not_match_language"
-	DiscardInvalidBrackets   string = "discard-invalid_brackets"
-	DiscardSyntaxError       string = "discard-syntax_error"
-	DicardCssContent         string = "discard-css_content"
+	DiscardExtremeRepetition string = "discard-extreme-repetition"
+	DiscardNotMatchLanguage  string = "discard-not-match-language"
+	DiscardInvalidBrackets   string = "discard-invalid-brackets"
+	DiscardSyntaxError       string = "discard-syntax-error"
+	DicardCssContent         string = "discard-css-content"
 	CutSingleLine            string = "cut-single-line"
-	CutRepetitiveText        string = "cut-repetitive_text"
-	CutPrefixOverlap         string = "cut-prefix_overlap"
-	CutSuffixOverlap         string = "cut-suffix_overlap"
-	CutSyntaxError           string = "cut-syntax_error"
+	CutRepetitiveText        string = "cut-repetitive-text"
+	CutPrefixOverlap         string = "cut-prefix-overlap"
+	CutSuffixOverlap         string = "cut-suffix-overlap"
+	CutSyntaxError           string = "cut-syntax-error"
 )
 
 /**
@@ -81,11 +81,11 @@ var prunerDefs map[string]Pruner = map[string]Pruner{
  * }
  */
 type PrunerContext struct {
-	CompletionID   string `json:"completion_id"`
-	Language       string `json:"language"`
-	CompletionCode string `json:"completion_code"`
-	Prefix         string `json:"prefix"`
-	Suffix         string `json:"suffix"`
+	CompletionID   string
+	Language       string
+	CompletionCode string
+	Prefix         string
+	Suffix         string
 }
 
 /**
@@ -392,11 +392,17 @@ func (p *Cutter) Type() PrunerType {
 	return TypeCutter
 }
 
+// ------------------------------------------------------------------------------
+//
+//	Dicarders
+//
+// ------------------------------------------------------------------------------
+
 /**
  * 极端重复内容丢弃处理器
  * @description
  * - 检测并丢弃包含极端重复内容的补全
- * - 使用isExtremeRepetition函数检测重复模式
+ * - 使用IsExtremeRepetition函数检测重复模式
  * - 如果检测到极端重复，清空补全内容
  * - 继承自Discarder基类
  * @example
@@ -411,7 +417,7 @@ type ExtremeRepetitionDiscarder struct{ Discarder }
 
 func (p *ExtremeRepetitionDiscarder) Process(ctx *PrunerContext) bool {
 	// 极端重复内容丢弃
-	flag, _, _ := isExtremeRepetition(ctx.CompletionCode)
+	flag, _, _ := parser.IsExtremeRepetition(ctx.CompletionCode)
 	if !flag {
 		return false
 	}
@@ -444,7 +450,7 @@ type NotMatchLanguageDiscarder struct{ Discarder }
 
 func (p *NotMatchLanguageDiscarder) Process(ctx *PrunerContext) bool {
 	// 非python语言但是python代码，则丢弃补全内容
-	if strings.ToLower(ctx.Language) != "python" && IsPythonText(ctx.CompletionCode) {
+	if ctx.Language != "python" && parser.IsPythonText(ctx.CompletionCode) {
 		ctx.CompletionCode = ""
 		return true
 	}
@@ -453,103 +459,6 @@ func (p *NotMatchLanguageDiscarder) Process(ctx *PrunerContext) bool {
 
 func (p *NotMatchLanguageDiscarder) Name() string {
 	return string(DiscardNotMatchLanguage)
-}
-
-/**
- * 重复文本裁剪处理器
- * @description
- * - 检测并裁剪补全中的重复文本
- * - 使用cutRepetitiveText函数处理重复内容
- * - 如果检测到重复并进行裁剪，返回true
- * - 继承自Cutter基类
- * @example
- * processor := &RepetitiveTextCutter{}
- * ctx := &PrunerContext{
- *     CompletionCode: "function test() { return; return; return; }",
- * }
- * modified := processor.Process(ctx)
- * // 裁剪重复内容后，ctx.CompletionCode = "function test() { return; }"，modified = true
- */
-type RepetitiveTextCutter struct{ Cutter }
-
-func (p *RepetitiveTextCutter) Process(ctx *PrunerContext) bool {
-	processedCode := cutRepetitiveText(ctx.CompletionCode)
-	if processedCode != ctx.CompletionCode {
-		ctx.CompletionCode = processedCode
-		return true
-	}
-	return false
-}
-
-func (p *RepetitiveTextCutter) Name() string {
-	return string(CutRepetitiveText)
-}
-
-/**
- * 前缀重叠裁剪处理器
- * @description
- * - 检测并裁剪与前缀重叠的补全内容
- * - 使用cutPrefixOverlap函数处理重叠部分
- * - 默认使用3行的cutLine参数
- * - 如果检测到重叠并进行裁剪，返回true
- * - 继承自Cutter基类
- * @example
- * processor := &PrefixOverlapCutter{}
- * ctx := &PrunerContext{
- *     Prefix: "function test() {",
- *     CompletionCode: "function test() { return; }",
- * }
- * modified := processor.Process(ctx)
- * // 裁剪重叠部分后，ctx.CompletionCode = "return; }"，modified = true
- */
-type PrefixOverlapCutter struct{ Cutter }
-
-func (p *PrefixOverlapCutter) Process(ctx *PrunerContext) bool {
-	// 补全内容前缀重复处理
-	// 使用默认的cutLine参数值3
-	processedCode := cutPrefixOverlap(ctx.CompletionCode, ctx.Prefix, ctx.Suffix, 3)
-	if processedCode != ctx.CompletionCode {
-		ctx.CompletionCode = processedCode
-		return true
-	}
-	return false
-}
-
-func (p *PrefixOverlapCutter) Name() string {
-	return string(CutPrefixOverlap)
-}
-
-/**
- * 后缀重叠裁剪处理器
- * @description
- * - 检测并裁剪与后缀重叠的补全内容
- * - 使用cutSuffixOverlap函数处理重叠部分
- * - 默认使用3行的cutLine参数和8的ignoreOverlapLen参数
- * - 如果检测到重叠并进行裁剪，返回true
- * - 继承自Cutter基类
- * @example
- * processor := &SuffixOverlapCutter{}
- * ctx := &PrunerContext{
- *     Suffix: "\n    return; }",
- *     CompletionCode: "function test() {\n    return; }",
- * }
- * modified := processor.Process(ctx)
- * // 裁剪重叠部分后，ctx.CompletionCode = "function test() {"，modified = true
- */
-type SuffixOverlapCutter struct{ Cutter }
-
-func (p *SuffixOverlapCutter) Process(ctx *PrunerContext) bool {
-	// 使用默认的cutLine参数值3和ignoreOverlapLen参数值8
-	processedCode := cutSuffixOverlap(ctx.CompletionCode, ctx.Prefix, ctx.Suffix, 3, 8)
-	if processedCode != ctx.CompletionCode {
-		ctx.CompletionCode = processedCode
-		return true
-	}
-	return false
-}
-
-func (p *SuffixOverlapCutter) Name() string {
-	return string(CutSuffixOverlap)
 }
 
 // 以下是工具函数的占位符，后续需要从common.py移植实现
@@ -572,10 +481,7 @@ func (p *SuffixOverlapCutter) Name() string {
 type InvalidBracketsDiscarder struct{ Discarder }
 
 func (p *InvalidBracketsDiscarder) Process(ctx *PrunerContext) bool {
-	if !IsValidBrackets(ctx.CompletionCode) {
-		return true
-	}
-	return false
+	return !parser.IsValidBrackets(ctx.CompletionCode)
 }
 
 func (p *InvalidBracketsDiscarder) Name() string {
@@ -603,7 +509,7 @@ type CssContentDiscarder struct{ Discarder }
 
 func (p *CssContentDiscarder) Process(ctx *PrunerContext) bool {
 	// 如果是非CSS语言但是包含CSS内容，则去除CSS内容
-	if strings.ToLower(ctx.Language) != "css" && JudgeCss(ctx.Language, ctx.CompletionCode, 0.7) {
+	if ctx.Language != "css" && parser.JudgeCss(ctx.Language, ctx.CompletionCode, 0.7) {
 		ctx.CompletionCode = ""
 		return true
 	}
@@ -647,6 +553,109 @@ func (p *SyntaxErrorDiscarder) Name() string {
 	return string(DiscardSyntaxError)
 }
 
+// ------------------------------------------------------------------------------
+//
+//	Cutters
+//
+// ------------------------------------------------------------------------------
+
+/**
+ * 重复文本裁剪处理器
+ * @description
+ * - 检测并裁剪补全中的重复文本
+ * - 使用cutRepetitiveText函数处理重复内容
+ * - 如果检测到重复并进行裁剪，返回true
+ * - 继承自Cutter基类
+ * @example
+ * processor := &RepetitiveTextCutter{}
+ * ctx := &PrunerContext{
+ *     CompletionCode: "function test() { return; return; return; }",
+ * }
+ * modified := processor.Process(ctx)
+ * // 裁剪重复内容后，ctx.CompletionCode = "function test() { return; }"，modified = true
+ */
+type RepetitiveTextCutter struct{ Cutter }
+
+func (p *RepetitiveTextCutter) Process(ctx *PrunerContext) bool {
+	code := parser.CutRepetitiveText(ctx.CompletionCode)
+	if code != ctx.CompletionCode {
+		ctx.CompletionCode = code
+		return true
+	}
+	return false
+}
+
+func (p *RepetitiveTextCutter) Name() string {
+	return string(CutRepetitiveText)
+}
+
+/**
+ * 前缀重叠裁剪处理器
+ * @description
+ * - 检测并裁剪与前缀重叠的补全内容
+ * - 使用CutPrefixOverlap函数处理重叠部分
+ * - 默认使用3行的cutLine参数
+ * - 如果检测到重叠并进行裁剪，返回true
+ * - 继承自Cutter基类
+ * @example
+ * processor := &PrefixOverlapCutter{}
+ * ctx := &PrunerContext{
+ *     Prefix: "function test() {",
+ *     CompletionCode: "function test() { return; }",
+ * }
+ * modified := processor.Process(ctx)
+ * // 裁剪重叠部分后，ctx.CompletionCode = "return; }"，modified = true
+ */
+type PrefixOverlapCutter struct{ Cutter }
+
+func (p *PrefixOverlapCutter) Process(ctx *PrunerContext) bool {
+	// 补全内容前缀重复处理
+	// 使用默认的cutLine参数值3
+	code := parser.CutPrefixOverlap(ctx.CompletionCode, ctx.Prefix, ctx.Suffix, 3)
+	if code != ctx.CompletionCode {
+		ctx.CompletionCode = code
+		return true
+	}
+	return false
+}
+
+func (p *PrefixOverlapCutter) Name() string {
+	return string(CutPrefixOverlap)
+}
+
+/**
+ * 后缀重叠裁剪处理器
+ * @description
+ * - 检测并裁剪与后缀重叠的补全内容
+ * - 使用CutSuffixOverlap函数处理重叠部分
+ * - 默认使用3行的cutLine参数和8的ignoreOverlapLen参数
+ * - 如果检测到重叠并进行裁剪，返回true
+ * - 继承自Cutter基类
+ * @example
+ * processor := &SuffixOverlapCutter{}
+ * ctx := &PrunerContext{
+ *     Suffix: "\n    return; }",
+ *     CompletionCode: "function test() {\n    return; }",
+ * }
+ * modified := processor.Process(ctx)
+ * // 裁剪重叠部分后，ctx.CompletionCode = "function test() {"，modified = true
+ */
+type SuffixOverlapCutter struct{ Cutter }
+
+func (p *SuffixOverlapCutter) Process(ctx *PrunerContext) bool {
+	// 使用默认的cutLine参数值3和ignoreOverlapLen参数值8
+	code := parser.CutSuffixOverlap(ctx.CompletionCode, ctx.Prefix, ctx.Suffix, 3, 8)
+	if code != ctx.CompletionCode {
+		ctx.CompletionCode = code
+		return true
+	}
+	return false
+}
+
+func (p *SuffixOverlapCutter) Name() string {
+	return string(CutSuffixOverlap)
+}
+
 /**
  * 语法错误裁剪处理器
  * @description
@@ -670,14 +679,16 @@ type SyntaxErrorCutter struct{ Cutter }
 
 func (p *SyntaxErrorCutter) Process(ctx *PrunerContext) bool {
 	// 进行语法错误拦截和代码裁剪
-	tsUtil := parser.NewSimpleParser(ctx.Language)
-	if tsUtil == nil {
+	ps := parser.NewSimpleParser(ctx.Language)
+	if ps == nil {
 		return false
 	}
-
-	processedCode := tsUtil.InterceptSyntaxErrorCode(ctx.CompletionCode, ctx.Prefix, ctx.Suffix)
-	if processedCode != ctx.CompletionCode {
-		ctx.CompletionCode = processedCode
+	if strings.TrimSpace(ctx.Suffix) == "" {
+		return false
+	}
+	code := ps.InterceptSyntaxErrorCode(ctx.CompletionCode, ctx.Prefix, ctx.Suffix)
+	if code != ctx.CompletionCode {
+		ctx.CompletionCode = code
 		return true
 	}
 	return false
@@ -690,9 +701,9 @@ func (p *SyntaxErrorCutter) Name() string {
 type SingleLineCutter struct{ Cutter }
 
 func (p *SingleLineCutter) Process(ctx *PrunerContext) bool {
-	processedCode := pruneSingleLine(ctx.CompletionCode, ctx.Prefix, ctx.Suffix, ctx.Language)
-	if processedCode != ctx.CompletionCode {
-		ctx.CompletionCode = processedCode
+	code := pruneSingleLine(ctx.CompletionCode, ctx.Prefix, ctx.Suffix, ctx.Language)
+	if code != ctx.CompletionCode {
+		ctx.CompletionCode = code
 		return true
 	}
 	return false
@@ -723,45 +734,16 @@ func (p *SingleLineCutter) Name() string {
  * // invalid = false (语法错误)
  */
 func isCodeSyntax(language, code, prefix, suffix string) bool {
-	tsUtil := parser.NewSimpleParser(language)
-	if tsUtil == nil {
+	ps := parser.NewSimpleParser(language)
+	if ps == nil {
 		return true
 	}
 
 	// 提取准确的代码块前后缀
-	newPrefix, newSuffix := tsUtil.ExtractAccurateBlockPrefixSuffix(prefix, suffix)
+	newPrefix, newSuffix := ps.ExtractAccurateBlockPrefixSuffix(prefix, suffix)
 
 	// 检查语法
-	return tsUtil.IsCodeSyntax(newPrefix + code + newSuffix)
-}
-
-// 判断是否为单行补全
-func needSingleLine(linePrefix, lineSuffix, language string) bool {
-	// 简化的单行补全判断逻辑
-	// 可以根据实际需求扩展，参考Python代码中的CompletionLineHandler逻辑
-
-	// 如果光标前缀不为空且光标后缀为空，可能是单行补全
-	if linePrefix != "" && lineSuffix == "" {
-		return true
-	}
-
-	// 如果光标前缀以特定字符结尾，可能是单行补全
-	if strings.HasSuffix(linePrefix, ".") ||
-		strings.HasSuffix(linePrefix, " ") ||
-		strings.HasSuffix(linePrefix, "\t") {
-		return true
-	}
-
-	// 根据语言类型判断
-	switch strings.ToLower(language) {
-	case "python", "javascript", "typescript", "java", "c", "cpp":
-		// 对于这些语言，如果光标在行首，可能是单行补全
-		if strings.TrimSpace(linePrefix) == "" {
-			return true
-		}
-	}
-
-	return false
+	return ps.IsCodeSyntax(newPrefix + code + newSuffix)
 }
 
 func pruneSingleLine(completionText, prefix, suffix, lang string) string {
@@ -777,7 +759,7 @@ func pruneSingleLine(completionText, prefix, suffix, lang string) string {
 			lineSuffix += "\n"
 		}
 	}
-	if needSingleLine(linePrefix, lineSuffix, lang) {
+	if parser.NeedSingleCompletion(linePrefix, lineSuffix, lang) {
 		lines := strings.Split(completionText, "\n")
 		if len(lines) <= 1 {
 			return completionText

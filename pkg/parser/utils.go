@@ -1,22 +1,10 @@
-package completions
+package parser
 
 import (
 	"os"
 	"regexp"
 	"strings"
-	"unicode"
 )
-
-// STR_PREFIX_CONFIG 字符串前缀配置
-var STR_PREFIX_CONFIG = []struct {
-	MaxTokenSequenceLength int
-	LastTokensToConsider   int
-}{
-	{1, 10},
-	{10, 30},
-	{20, 45},
-	{30, 60},
-}
 
 /**
  * Compute the longest prefix suffix match length for a string
@@ -53,72 +41,6 @@ func computePrefixSuffixMatchLength(content string) []int {
 }
 
 /**
- * Check if content contains repetitive patterns
- * @param {string} content - Input content to check for repetition
- * @returns {bool} Returns true if content is repetitive, false otherwise
- * @description
- * - Uses prefix suffix match length to detect repetitive patterns
- * - Checks against multiple configuration thresholds
- * - Returns true if any configuration detects repetition
- * @example
- * if isRepetitiveContent("abcabcabc") {
- *     // Content is repetitive
- * }
- */
-func isRepetitiveContent(content string) bool {
-	matchLengths := computePrefixSuffixMatchLength(content)
-
-	for _, config := range STR_PREFIX_CONFIG {
-		// 考虑最后lastTokensToConsider个字符组成的字符串的前后缀重复字符数
-		maxMatch := 0
-		end := len(matchLengths)
-		start := end - config.LastTokensToConsider
-		if start < 0 {
-			start = 0
-		}
-
-		for i := start; i < end; i++ {
-			if matchLengths[i] > maxMatch {
-				maxMatch = matchLengths[i]
-			}
-		}
-
-		if len(content) >= config.LastTokensToConsider &&
-			config.LastTokensToConsider-1-maxMatch <= config.MaxTokenSequenceLength {
-			return true
-		}
-	}
-
-	return false
-}
-
-/**
- * Check if string ending contains repetitive content
- * @param {string} content - Input string to check for repetition
- * @returns {bool} Returns true if ending is repetitive, false otherwise
- * @description
- * - Reverses string and checks for repetitive content
- * - Also checks filtered version without empty lines
- * - Returns true if either reversed or filtered version is repetitive
- * @example
- * if isRepetitive("abcabc") {
- *     // String ending is repetitive
- * }
- */
-func isRepetitive(content string) bool {
-	// 反转字符串
-	reversed := reverseString(content)
-	if isRepetitiveContent(reversed) {
-		return true
-	}
-
-	// 过滤空格后反转
-	filtered := filterNonEmptyLines(content)
-	reversedFiltered := reverseString(filtered)
-	return isRepetitiveContent(reversedFiltered)
-}
-
-/**
  * Reverse a string character by character
  * @param {string} s - Input string to reverse
  * @returns {string} Returns reversed string
@@ -139,109 +61,6 @@ func reverseString(s string) string {
 }
 
 /**
- * Filter out empty lines from content
- * @param {string} content - Input content with potentially empty lines
- * @returns {string} Returns content with empty lines removed
- * @description
- * - Splits content into individual lines
- * - Filters out lines that are empty or contain only whitespace
- * - Joins non-empty lines back with newline separators
- * @example
- * filtered := filterNonEmptyLines("line1\n\nline2\n")
- * // filtered will be "line1\nline2"
- */
-func filterNonEmptyLines(content string) string {
-	lines := strings.Split(content, "\n")
-	var nonEmptyLines []string
-	for _, line := range lines {
-		if strings.TrimSpace(line) != "" {
-			nonEmptyLines = append(nonEmptyLines, line)
-		}
-	}
-	return strings.Join(nonEmptyLines, "\n")
-}
-
-/**
- * Check if string contains only non-alphabetic characters
- * @param {string} input - Input string to check
- * @returns {bool} Returns true if string has no alphabetic characters, false otherwise
- * @description
- * - Iterates through each character in the string
- * - Returns false if any alphabetic character is found
- * - Returns true if all characters are non-alphabetic
- * @example
- * if containsOnlyNonAlpha("123!@#") {
- *     // String contains only non-alphabetic characters
- * }
- */
-func containsOnlyNonAlpha(input string) bool {
-	for _, c := range input {
-		if unicode.IsLetter(c) {
-			return false
-		}
-	}
-	return true
-}
-
-/**
- * Check if text appears at the end of prefix or start of suffix
- * @param {string} text - Text to check for inclusion
- * @param {string} prefix - Prefix text to check ending
- * @param {string} suffix - Suffix text to check beginning
- * @returns {bool} Returns true if text is included in context, false otherwise
- * @description
- * - Returns true for empty text
- * - Special handling for short texts (<= 3 chars) starting suffix
- * - Special handling for non-alphabetic texts starting suffix
- * - Checks if text is suffix of prefix or prefix of suffix
- * - Also checks if text is contained in suffix lines for multi-line texts
- * @example
- * if checkContextIncludeText("func", "prefix func", "func suffix") {
- *     // Text is included in context
- * }
- */
-func checkContextIncludeText(text, prefix, suffix string) bool {
-	if strings.TrimSpace(text) == "" {
-		return true
-	}
-
-	if len(text) <= 3 && strings.TrimSpace(suffix) != "" &&
-		strings.HasPrefix(strings.TrimSpace(suffix), string(text[0])) {
-		return true
-	}
-
-	if containsOnlyNonAlpha(text) && strings.TrimSpace(suffix) != "" &&
-		strings.HasPrefix(strings.TrimSpace(suffix), string(text[0])) {
-		return true
-	}
-
-	if text != "" && len(text) <= 5 {
-		return false
-	}
-
-	trimmedText := strings.TrimSpace(text)
-	trimmedPrefix := strings.TrimSpace(prefix)
-
-	lineCount := len(strings.Split(text, "\n"))
-	suffixLines := strings.Split(strings.TrimSpace(suffix), "\n")
-	doubleTextLines := suffixLines
-	if len(suffixLines) > lineCount*2 {
-		doubleTextLines = suffixLines[:lineCount*2]
-	}
-	doubleText := strings.Join(doubleTextLines, "\n")
-
-	if strings.HasSuffix(trimmedPrefix, trimmedText) {
-		return true
-	} else if strings.HasPrefix(doubleText, trimmedText) {
-		return true
-	} else if lineCount > 2 && strings.Contains(doubleText, trimmedText) {
-		return true
-	}
-
-	return false
-}
-
-/**
  * Remove overlapping content between completion text and suffix prefix
  * @param {string} text - Completion text to be processed
  * @param {string} prefix - Prefix text before cursor position (not used in this function)
@@ -257,10 +76,10 @@ func checkContextIncludeText(text, prefix, suffix string) bool {
  * - Avoids cutting if overlap content is too short (ignoreOverlapLen)
  * - Processes multiple lines by removing first line from suffix and repeating
  * @example
- * processed := cutSuffixOverlap("completion", "prefix", "pletion suffix", 5, 3)
+ * processed := CutSuffixOverlap("completion", "prefix", "pletion suffix", 5, 3)
  * // processed will be "com"
  */
-func cutSuffixOverlap(text, prefix, suffix string, cutLine int, ignoreOverlapLen int) string {
+func CutSuffixOverlap(text, prefix, suffix string, cutLine int, ignoreOverlapLen int) string {
 	if len(text) == 0 {
 		return text
 	}
@@ -311,7 +130,6 @@ func cutSuffixOverlap(text, prefix, suffix string, cutLine int, ignoreOverlapLen
 	return text
 }
 
-// cutPrefixOverlap 去除「补全内容」与prefix的后缀重叠部分
 /**
  * Remove overlapping content between completion text and prefix suffix
  * @param {string} text - The completion text to be processed
@@ -327,9 +145,9 @@ func cutSuffixOverlap(text, prefix, suffix string, cutLine int, ignoreOverlapLen
  * @example
  * // If prefix ends with "function test() {" and completion starts with "function test() {",
  * // the completion will be considered overlapping and removed
- * processedText := cutPrefixOverlap(completion, prefix, suffix, 5)
+ * processedText := CutPrefixOverlap(completion, prefix, suffix, 5)
  */
-func cutPrefixOverlap(text, prefix, suffix string, cutLine int) string {
+func CutPrefixOverlap(text, prefix, suffix string, cutLine int) string {
 	// Remove leading/trailing whitespace from completion text
 	stripText := strings.TrimSpace(text)
 	if len(stripText) == 0 {
@@ -476,10 +294,10 @@ func judgePrefixFullLineRepetitive(completionText, prefix string) bool {
  * - Uses internal ratio threshold of 0.15 for repetition detection
  * - Delegates to doCutRepetitiveText for actual processing
  * @example
- * processed := cutRepetitiveText("abc\nabc\nabc\ndef")
+ * processed := CutRepetitiveText("abc\nabc\nabc\ndef")
  * // processed will remove repetitive "abc" lines
  */
-func cutRepetitiveText(text string) string {
+func CutRepetitiveText(text string) string {
 	if len(text) == 0 {
 		return text
 	}
@@ -613,12 +431,12 @@ func longestCommonSubstring(a, b string) string {
  * - Counts occurrences with same position in subsequent lines
  * - Returns true if repetition count > 8 or > half of total lines
  * @example
- * hasRepetition, pattern, count := isExtremeRepetition("line1\nline1\nline1")
+ * hasRepetition, pattern, count := IsExtremeRepetition("line1\nline1\nline1")
  * if hasRepetition {
  *     fmt.Printf("Pattern '%s' repeated %d times", pattern, count)
  * }
  */
-func isExtremeRepetition(code string) (bool, string, int) {
+func IsExtremeRepetition(code string) (bool, string, int) {
 	if len(code) == 0 {
 		return false, "", 0
 	}
@@ -682,14 +500,14 @@ func isExtremeRepetition(code string) (bool, string, int) {
  * smaller := min(5, 10)
  * // smaller will be 5
  */
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
+// func min(a, b int) int {
+// 	if a < b {
+// 		return a
+// 	}
+// 	return b
+// }
 
-// IsPythonText 判断是否为Python文本
+// 判断是否为Python文本
 func IsPythonText(text string) bool {
 	pythonTextRules := os.Getenv("PYTHON_TEXT_RULES")
 	if pythonTextRules == "" {
@@ -722,18 +540,14 @@ const (
 	FrontLanguageCSS  FrontLanguageEnum = "css"
 )
 
-// GetValues 获取前端语言枚举值
-func (e FrontLanguageEnum) GetValues() []FrontLanguageEnum {
-	return []FrontLanguageEnum{FrontLanguageVue, FrontLanguageHTML, FrontLanguageTS, FrontLanguageCSS}
-}
+var frontendLanguages []FrontLanguageEnum = []FrontLanguageEnum{FrontLanguageVue, FrontLanguageHTML, FrontLanguageTS, FrontLanguageCSS}
 
-// JudgeCss 判断文本是否为css样式
+// 判断文本是否为css样式
 func JudgeCss(language string, text string, ratio float64) bool {
 	// 检查语言是否为前端语言
 	isFrontLanguage := false
-	frontLanguages := FrontLanguageEnum("").GetValues()
-	for _, lang := range frontLanguages {
-		if strings.ToLower(language) == string(lang) {
+	for _, lang := range frontendLanguages {
+		if language == string(lang) {
 			isFrontLanguage = true
 			break
 		}
@@ -759,7 +573,7 @@ func JudgeCss(language string, text string, ratio float64) bool {
 		if line == "\n" || line == "" {
 			continue
 		}
-		if IncludeCss(line) {
+		if includeCss(line) {
 			count++
 		}
 		lineCount++
@@ -771,8 +585,8 @@ func JudgeCss(language string, text string, ratio float64) bool {
 	return false
 }
 
-// IncludeCss 包含css样式
-func IncludeCss(line string) bool {
+// 包含css样式
+func includeCss(line string) bool {
 	// 去除CSS注释
 	line = cssCommentPattern.ReplaceAllString(line, "")
 
@@ -789,7 +603,7 @@ func IncludeCss(line string) bool {
 	return false
 }
 
-// IsValidBrackets 用于判断text字符串中括号是否完整
+// 用于判断text字符串中括号是否完整
 func IsValidBrackets(text string) bool {
 	stack := make([]rune, 0)
 	mapping := map[rune]rune{
@@ -810,175 +624,4 @@ func IsValidBrackets(text string) bool {
 	}
 
 	return len(stack) == 0
-}
-
-// GetLeftPairedSymbols 获取左括号映射
-func GetLeftPairedSymbols() map[string]string {
-	return map[string]string{
-		"(": ")",
-		"[": "]",
-		"{": "}",
-	}
-}
-
-// GetRightPairedSymbols 获取右括号映射
-func GetRightPairedSymbols() map[string]string {
-	rightSymbols := make(map[string]string)
-	leftSymbols := GetLeftPairedSymbols()
-	for k, v := range leftSymbols {
-		rightSymbols[v] = k
-	}
-	return rightSymbols
-}
-
-// GetQuotesSymbols 获取引号符号映射
-func GetQuotesSymbols() map[string]string {
-	return map[string]string{
-		"\"": "\"",
-		"'":  "'",
-	}
-}
-
-// GetBoundarySymbols 获取边界符号
-func GetBoundarySymbols() []string {
-	return []string{"{", "(", "[", "\"", "'", ":", "<", ";", ",", ">", ".", "`"}
-}
-
-// CountPairedSymbols 统计成对出现的符号
-func CountPairedSymbols(text string) map[string]int {
-	symbolsMap := make(map[string]int)
-	rightSymbols := GetRightPairedSymbols()
-
-	for _, char := range text {
-		charStr := string(char)
-		// 忽略孤立的右括号
-		if expectedLeft, ok := rightSymbols[charStr]; ok {
-			if symbolsMap[expectedLeft] == 0 {
-				continue
-			}
-		}
-
-		leftSymbols := GetLeftPairedSymbols()
-		if _, ok := leftSymbols[charStr]; ok {
-			symbolsMap[charStr]++
-		}
-	}
-
-	return symbolsMap
-}
-
-// RemoveStrings 删除代码行中包含字符串的部分
-func RemoveStrings(codeLine string) string {
-	result := make([]rune, 0)
-	inString := false
-	var quoteChar rune
-	buffer := make([]rune, 0)
-
-	quotesSymbols := GetQuotesSymbols()
-
-	for _, char := range codeLine {
-		if !inString {
-			if _, ok := quotesSymbols[string(char)]; ok {
-				inString = true
-				quoteChar = char
-			} else {
-				result = append(result, char)
-			}
-		} else {
-			if char == quoteChar {
-				inString = false
-				quoteChar = 0
-				buffer = make([]rune, 0)
-			} else {
-				buffer = append(buffer, char)
-			}
-		}
-	}
-
-	if inString {
-		result = append(result, buffer...)
-	}
-
-	return string(result)
-}
-
-// IsCursorInParentheses 判断光标是否在括号内
-func IsCursorInParentheses(prefix, suffix string) bool {
-	findParenthesis := func(text string, symbol string, isReverse bool) int {
-		count := 0
-		leftSymbols := GetLeftPairedSymbols()
-
-		if isReverse {
-			runes := []rune(text)
-			for i := len(runes) - 1; i >= 0; i-- {
-				if string(runes[i]) == leftSymbols[symbol] {
-					count++
-				}
-				if string(runes[i]) == symbol {
-					if count <= 0 {
-						return len(runes) - 1 - i
-					}
-					count--
-				}
-			}
-		} else {
-			for i, char := range text {
-				if string(char) == leftSymbols[symbol] {
-					count++
-				}
-				if string(char) == symbol {
-					if count <= 0 {
-						return i
-					}
-					count--
-				}
-			}
-		}
-		return -1
-	}
-
-	leftSymbols := GetLeftPairedSymbols()
-	for leftSymbol, rightSymbol := range leftSymbols {
-		leftParenthesisIndex := findParenthesis(prefix, leftSymbol, true)
-		rightParenthesisIndex := findParenthesis(suffix, rightSymbol, false)
-		if leftParenthesisIndex != -1 && rightParenthesisIndex != -1 {
-			return true
-		}
-	}
-
-	return false
-}
-
-// IsCursorInString 判断光标是否在字符串内
-func IsCursorInString(cursorPrefix string) bool {
-	quotesSymbols := GetQuotesSymbols()
-	quotesCount := make(map[string]int)
-
-	for k := range quotesSymbols {
-		quotesCount[k] = 0
-	}
-
-	i := 0
-	runes := []rune(cursorPrefix)
-	for i < len(runes) {
-		if runes[i] == '\\' {
-			i += 2
-			continue
-		}
-
-		charStr := string(runes[i])
-		if _, ok := quotesSymbols[charStr]; ok {
-			quotesCount[charStr]++
-		}
-		i++
-	}
-
-	// 如果引号数量为奇数，则光标在字符串内
-	for _, count := range quotesCount {
-		if count%2 == 1 {
-			return true
-		}
-	}
-
-	return false
 }

@@ -31,7 +31,6 @@ func Completions(c *gin.Context) {
 		})
 		return
 	}
-	zap.L().Info("Completions", zap.Any("req", &req))
 	req.Headers = c.Request.Header
 
 	handler := completions.NewCompletionHandler(nil)
@@ -64,10 +63,12 @@ func respCompletion(c *gin.Context, req *completions.CompletionRequest, rsp *com
 		zap.L().Warn("completion failed", zap.String("completionID", rsp.ID),
 			zap.String("clientID", req.ClientID),
 			zap.String("status", string(rsp.Status)),
+			zap.Any("request", req),
 			zap.Any("response", rsp))
 	} else {
 		zap.L().Info("completion succeeded", zap.String("completionID", rsp.ID),
 			zap.String("clientID", req.ClientID),
+			zap.Any("request", req),
 			zap.Any("response", rsp))
 	}
 	statusCode := http.StatusOK

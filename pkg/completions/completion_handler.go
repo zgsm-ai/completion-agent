@@ -3,6 +3,7 @@ package completions
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"completion-agent/pkg/config"
@@ -98,13 +99,17 @@ func (h *CompletionHandler) Adapt(input *CompletionInput) *model.CompletionParam
 	para.Model = input.Model
 	para.ClientID = input.ClientID
 	para.CompletionID = input.CompletionID
-	para.Language = input.LanguageID
+	para.Language = strings.ToLower(input.LanguageID)
 	para.Prefix = input.Processed.Prefix
 	para.Suffix = input.Processed.Suffix
 	para.CodeContext = input.Processed.CodeContext
 	para.Stop = stopWords
 	para.MaxTokens = h.cfg.MaxOutput
 	para.Temperature = float32(input.Temperature)
+	para.Verbose = input.Verbose
+	if h.cfg.ModelName != "" {
+		para.Model = h.cfg.ModelName
+	}
 	return &para
 }
 
@@ -152,7 +157,7 @@ func (h *CompletionHandler) CallLLM(c *CompletionContext, input *CompletionInput
 		completionText = rsp.Choices[0].Text
 	}
 	if completionText != "" && !config.Wrapper.Prune.Disabled {
-		completionText = h.pruneCompletionCode(completionText, para.Prefix, para.Suffix, input.LanguageID)
+		completionText = h.pruneCompletionCode(completionText, para.Prefix, para.Suffix, para.Language)
 	}
 	c.Perf.PromptTokens = rsp.Usage.PromptTokens
 	c.Perf.CompletionTokens = rsp.Usage.CompletionTokens

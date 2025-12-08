@@ -81,7 +81,7 @@ func main() {
 		gin.SetMode(gin.ReleaseMode)
 	}
 	// 初始化日志系统
-	logger.InitLogger("", *mode, 50*1024*1024) // 默认路径，同步输出到控制台和文件，最大50MB
+	logger.InitLogger("", *mode, 5*1024*1024) // 默认路径，同步输出到控制台和文件，最大5MB
 	defer logger.Sync()
 
 	initConfig()
@@ -229,9 +229,6 @@ func initTokenizer() {
  * - 用于main函数中初始化应用程序配置
  * @throws
  * - 如果配置加载失败，会导致程序panic并退出
- * @example
- * initConfig()
- * // 输出日志: Fetch and load configures
  */
 func initConfig() {
 	zap.L().Info("Fetch and load configures")

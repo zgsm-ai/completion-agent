@@ -41,7 +41,7 @@ func NewSimpleParser(language string) Parser {
  * // isValid = true
  */
 func (t *SimpleParser) IsCodeSyntax(code string) bool {
-	switch strings.ToLower(t.language) {
+	switch t.language {
 	case "python":
 		return t.checkPythonSyntax(code)
 	case "javascript", "typescript":
