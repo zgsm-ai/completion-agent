@@ -18,3 +18,5 @@ func GetCostrictDir() string {
 	homeDir, _ := os.UserHomeDir()
 	return filepath.Join(homeDir, ".costrict")
 }
+
+var DebugMode bool = false

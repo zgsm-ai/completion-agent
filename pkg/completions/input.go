@@ -25,9 +25,8 @@ import (
  * response := input.Preprocess(ctx)
  */
 type CompletionInput struct {
-	CompletionRequest               //原始请求中的BODY
-	Headers           http.Header   //原始请求中的头部
-	Processed         PromptOptions //加工过的提示词
+	CompletionRequest             //原始请求中的BODY
+	Headers           http.Header //原始请求中的头部
 }
 
 /**
@@ -62,13 +61,12 @@ var contextClient *codebase_context.ContextClient
  * }
  */
 func (in *CompletionInput) Preprocess(c *CompletionContext) *CompletionResponse {
-	// 0. 补全拒绝规则链处理
-	err := NewFilterChain(config.Wrapper).Handle(in)
-	if err != nil {
+	if err := in.GetPrompts(); err != nil {
 		return CancelRequest(in.CompletionID, in.Model, c.Perf, model.StatusRejected, err)
 	}
-	// 1. 解析请求参数
-	if err := in.GetPrompts(); err != nil {
+	// 1. 补全拒绝规则链处理
+	err := NewFilterChain(config.Wrapper).Handle(in)
+	if err != nil {
 		return CancelRequest(in.CompletionID, in.Model, c.Perf, model.StatusRejected, err)
 	}
 	// 2. 获取上下文信息
@@ -87,20 +85,20 @@ func (in *CompletionInput) Preprocess(c *CompletionContext) *CompletionResponse 
  * - 用于增强补全请求的上下文信息
  */
 func (in *CompletionInput) GetContext(c *CompletionContext) {
-	if in.Processed.CodeContext != "" {
+	if in.Prompts.CodeContext != "" {
 		return
 	}
 	if contextClient == nil {
 		contextClient = codebase_context.NewContextClient()
 	}
-	in.Processed.CodeContext = contextClient.GetContext(
+	in.Prompts.CodeContext = contextClient.GetContext(
 		c.Ctx,
 		in.ClientID,
-		in.Processed.ProjectPath,
-		in.Processed.FileProjectPath,
-		in.Processed.Prefix,
-		in.Processed.Suffix,
-		in.Processed.ImportContent,
+		in.Prompts.ProjectPath,
+		in.Prompts.FileProjectPath,
+		in.Prompts.Prefix,
+		in.Prompts.Suffix,
+		in.Prompts.ImportContent,
 		in.Headers,
 	)
 	c.Perf.ContextDuration = time.Since(c.Perf.ReceiveTime).Milliseconds()
@@ -118,8 +116,7 @@ func (in *CompletionInput) GetContext(c *CompletionContext) {
  */
 func (in *CompletionInput) GetPrompts() error {
 	if in.Prompts == nil {
-		return fmt.Errorf("Missing 'prompt_options'")
+		return fmt.Errorf("missing 'prompt_options'")
 	}
-	in.Processed = *in.Prompts
 	return nil
 }

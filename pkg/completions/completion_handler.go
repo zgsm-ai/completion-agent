@@ -7,7 +7,10 @@ import (
 	"time"
 
 	"completion-agent/pkg/config"
+	"completion-agent/pkg/env"
 	"completion-agent/pkg/model"
+
+	"go.uber.org/zap"
 )
 
 /**
@@ -89,7 +92,7 @@ func NewCompletionHandler(m model.LLM) *CompletionHandler {
 
 func (h *CompletionHandler) Adapt(input *CompletionInput) *model.CompletionParameter {
 	// 3. 补全模型相关的前置处理 （拼接prompt策略，单行/多行补全策略，裁剪过长上下文）
-	h.truncatePrompt(h.cfg, &input.Processed)
+	h.truncatePrompt(h.cfg, input.Prompts)
 
 	// 4. 准备停用词，根据是否单行补全调整停用词
 	stopWords := h.prepareStopWords(input)
@@ -100,9 +103,9 @@ func (h *CompletionHandler) Adapt(input *CompletionInput) *model.CompletionParam
 	para.ClientID = input.ClientID
 	para.CompletionID = input.CompletionID
 	para.Language = strings.ToLower(input.LanguageID)
-	para.Prefix = input.Processed.Prefix
-	para.Suffix = input.Processed.Suffix
-	para.CodeContext = input.Processed.CodeContext
+	para.Prefix = input.Prompts.Prefix
+	para.Suffix = input.Prompts.Suffix
+	para.CodeContext = input.Prompts.CodeContext
 	para.Stop = stopWords
 	para.MaxTokens = h.cfg.MaxOutput
 	para.Temperature = float32(input.Temperature)
@@ -134,9 +137,7 @@ func (h *CompletionHandler) Adapt(input *CompletionInput) *model.CompletionParam
  * input := &CompletionInput{...}
  * response := handler.CallLLM(ctx, input)
  */
-func (h *CompletionHandler) CallLLM(c *CompletionContext, input *CompletionInput) *CompletionResponse {
-	para := h.Adapt(input)
-
+func (h *CompletionHandler) CallLLM(c *CompletionContext, para *model.CompletionParameter) *CompletionResponse {
 	modelStartTime := time.Now().Local()
 	rsp, completionStatus, err := h.llm.Completions(c.Ctx, para)
 	modelEndTime := time.Now().Local()
@@ -194,5 +195,20 @@ func (h *CompletionHandler) HandleCompletion(c *CompletionContext, input *Comple
 	if rsp != nil {
 		return rsp
 	}
-	return h.CallLLM(c, input)
+	para := h.Adapt(input)
+	rsp = h.CallLLM(c, para)
+	if env.DebugMode {
+		zap.L().Debug("completion input", zap.Any("input", input))
+	}
+	if rsp.Status != model.StatusSuccess {
+		zap.L().Warn("completion failed",
+			zap.String("status", string(rsp.Status)),
+			zap.Any("request", para),
+			zap.Any("response", rsp))
+	} else {
+		zap.L().Info("completion succeeded",
+			zap.Any("request", para),
+			zap.Any("response", rsp))
+	}
+	return rsp
 }

@@ -42,15 +42,13 @@ type CompletionChoice struct {
  * - 用于性能监控和优化分析
  */
 type CompletionPerformance struct {
-	ReceiveTime     time.Time `json:"receive_time"`     //收到请求的时间
-	EnqueueTime     time.Time `json:"-"`                //开始排队时间
-	ContextDuration int64     `json:"context_duration"` //获取上下文的时长(毫秒)
-	// QueueDuration    int64     `json:"queue_duration"`   //排队时长(毫秒)
-	LLMDuration      int64 `json:"llm_duration"`   //调用大语言模型耗用的时长(毫秒)
-	TotalDuration    int64 `json:"total_duration"` //总时长(毫秒)
-	PromptTokens     int   `json:"prompt_tokens"`
-	CompletionTokens int   `json:"completion_tokens"`
-	TotalTokens      int   `json:"total_tokens"`
+	ReceiveTime      time.Time `json:"receive_time"`      //收到请求的时间
+	ContextDuration  int64     `json:"context_duration"`  //获取上下文的时长(毫秒)
+	LLMDuration      int64     `json:"llm_duration"`      //调用大语言模型耗用的时长(毫秒)
+	TotalDuration    int64     `json:"total_duration"`    //总时长(毫秒)
+	PromptTokens     int       `json:"prompt_tokens"`     //提示词token数
+	CompletionTokens int       `json:"completion_tokens"` //补全结果token数
+	TotalTokens      int       `json:"total_tokens"`      //总token数
 }
 
 /**

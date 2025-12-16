@@ -176,13 +176,6 @@ func (h *CompletionHandler) getFimPrompt(prefix, suffix, codeContext string, cfg
  * - 添加默认的FIM停用词"<｜end▁of▁sentence｜>"
  * - 如果后缀为空或只包含空白字符，添加多行停用词
  * - 用于控制补全生成的停止条件
- * @example
- * input := &CompletionInput{
- *     Stop: []string{";", "}"},
- *     Processed: PromptOptions{Suffix: ""},
- * }
- * stopWords := handler.prepareStopWords(input)
- * // stopWords = [";", "}", "<｜end▁of▁sentence｜>", "\n\n", "\n\n\n"]
  */
 func (h *CompletionHandler) prepareStopWords(input *CompletionInput) []string {
 	var stopWords []string
@@ -191,14 +184,11 @@ func (h *CompletionHandler) prepareStopWords(input *CompletionInput) []string {
 	if len(input.Stop) > 0 {
 		stopWords = append(stopWords, input.Stop...)
 	}
-
 	// 添加默认的FIM停用词
 	stopWords = append(stopWords, "<｜end▁of▁sentence｜>")
-
 	// 如果后缀为空，添加系统停用词
-	if input.Processed.Suffix == "" || strings.TrimSpace(input.Processed.Suffix) == "" {
+	if input.Prompts.Suffix == "" || strings.TrimSpace(input.Prompts.Suffix) == "" {
 		stopWords = append(stopWords, "\n\n", "\n\n\n")
 	}
-
 	return stopWords
 }

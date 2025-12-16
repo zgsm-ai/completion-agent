@@ -1,4 +1,4 @@
-package completions
+package server
 
 import (
 	"completion-agent/pkg/completions"
@@ -59,21 +59,9 @@ func Completions(c *gin.Context) {
  * respCompletion(c, req, rsp)
  */
 func respCompletion(c *gin.Context, req *completions.CompletionRequest, rsp *completions.CompletionResponse) {
-	if rsp.Status != model.StatusSuccess {
-		zap.L().Warn("completion failed", zap.String("completionID", rsp.ID),
-			zap.String("clientID", req.ClientID),
-			zap.String("status", string(rsp.Status)),
-			zap.Any("request", req),
-			zap.Any("response", rsp))
-	} else {
-		zap.L().Info("completion succeeded", zap.String("completionID", rsp.ID),
-			zap.String("clientID", req.ClientID),
-			zap.Any("request", req),
-			zap.Any("response", rsp))
-	}
 	statusCode := http.StatusOK
 	switch rsp.Status {
-	case model.StatusSuccess:
+	case model.StatusSuccess, model.StatusEmpty:
 		statusCode = http.StatusOK
 	case model.StatusCanceled:
 		statusCode = http.StatusRequestTimeout
@@ -81,9 +69,10 @@ func respCompletion(c *gin.Context, req *completions.CompletionRequest, rsp *com
 		statusCode = http.StatusGatewayTimeout
 	case model.StatusBusy:
 		statusCode = http.StatusServiceUnavailable
-	case model.StatusReqError:
-	case model.StatusRejected:
+	case model.StatusReqError, model.StatusRejected:
 		statusCode = http.StatusBadRequest
+	case model.StatusServerError, model.StatusModelError:
+		statusCode = http.StatusInternalServerError
 	default:
 		statusCode = http.StatusInternalServerError
 	}

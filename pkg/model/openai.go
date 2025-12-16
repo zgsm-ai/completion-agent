@@ -12,12 +12,16 @@ import (
 )
 
 type OpenAICompletion struct {
-	cfg *config.ModelConfig
+	cfg    *config.ModelConfig
+	client *http.Client
 }
 
 func NewOpenAICompletion(c *config.ModelConfig) LLM {
 	return &OpenAICompletion{
 		cfg: c,
+		client: &http.Client{
+			Timeout: c.Timeout.Duration(),
+		},
 	}
 }
 
@@ -72,10 +76,7 @@ func (m *OpenAICompletion) Completions(ctx context.Context, p *CompletionParamet
 	req.Header.Set("Authorization", m.cfg.Authorization)
 
 	// 发送请求
-	client := &http.Client{
-		Timeout: m.cfg.Timeout.Duration(),
-	}
-	resp, err := client.Do(req)
+	resp, err := m.client.Do(req)
 	if err != nil {
 		status := StatusServerError
 		switch err {

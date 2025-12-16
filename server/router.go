@@ -6,7 +6,6 @@ import (
 
 	"completion-agent/pkg/logger"
 	"completion-agent/pkg/metrics"
-	"completion-agent/server/completions"
 
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
@@ -38,7 +37,7 @@ func SetupRouter() *gin.Engine {
 		c.Writer.Header().Set("Content-Type", "application/json; charset=utf-8")
 		c.Next()
 	})
-	api.POST("/completions", completions.Completions)
+	api.POST("/completions", Completions)
 	api.POST("/logs", logHandler)
 
 	return r

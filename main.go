@@ -26,6 +26,7 @@ import (
 
 	_ "completion-agent/docs"
 	"completion-agent/pkg/config"
+	"completion-agent/pkg/env"
 	"completion-agent/pkg/logger"
 	_ "completion-agent/pkg/logger"
 	"completion-agent/pkg/model"
@@ -79,6 +80,9 @@ func main() {
 	// 设置Gin运行模式
 	if *mode == "release" {
 		gin.SetMode(gin.ReleaseMode)
+		env.DebugMode = false
+	} else {
+		env.DebugMode = true
 	}
 	// 初始化日志系统
 	logger.InitLogger("", *mode, 5*1024*1024) // 默认路径，同步输出到控制台和文件，最大5MB

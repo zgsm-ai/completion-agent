@@ -267,7 +267,7 @@ func (c *CodeFilters) cursorIsAtTheEnd(in *CompletionInput) bool {
 	// 光标位于有效行行尾的直接不触发补全
 	// 行尾定义：光标左侧是'>'、';'、'}'、')'，右侧是换行符号
 
-	textBeforeCursor, textAfterCursor := c.splitPrompt(in.Processed.Prefix)
+	textBeforeCursor, textAfterCursor := c.splitPrompt(in.Prompts.Prefix)
 	if textBeforeCursor != "" && textAfterCursor != "" {
 		// 解析endTag
 		endTags := c.parseEndTag()
@@ -332,7 +332,7 @@ func (c *CodeFilters) parseEndTag() []string {
  */
 func (c *CodeFilters) textAfterFillHereStartWithWord(in *CompletionInput) bool {
 	// 补全后面直接是英文字母开头或数字的不补全，比如修改变量名称的场景
-	_, textAfterCursor := c.splitPrompt(in.Processed.Prefix)
+	_, textAfterCursor := c.splitPrompt(in.Prompts.Prefix)
 	if textAfterCursor != "" {
 		firstChar := textAfterCursor[0]
 		if (firstChar >= 'a' && firstChar <= 'z') || (firstChar >= 'A' && firstChar <= 'Z') || (firstChar >= '0' && firstChar <= '9') {
@@ -360,7 +360,7 @@ func (c *CodeFilters) textAfterFillHereStartWithWord(in *CompletionInput) bool {
  */
 func (c *CodeFilters) tooFewLines(in *CompletionInput) bool {
 	// prompt行数太少不触发补全，排除空行场景
-	lines := strings.Split(in.Processed.Prefix, "\n")
+	lines := strings.Split(in.Prompts.Prefix, "\n")
 	nonEmptyLines := make([]string, 0)
 	for _, line := range lines {
 		if strings.TrimSpace(line) != "" {
@@ -443,7 +443,7 @@ func (h *HiddenScoreFilter) Judge(in *CompletionInput) RejectCode {
 
 	score := 0.0
 	if in.HideScores.DocumentLength != 0 {
-		score = h.CalculateHideScore(in.HideScores, in.Processed.Prefix, in.LanguageID)
+		score = h.CalculateHideScore(in.HideScores, in.Prompts.Prefix, in.LanguageID)
 	}
 
 	// 将分数更新到请求数据中（问题4修复）

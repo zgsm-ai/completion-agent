@@ -10,12 +10,16 @@ import (
 )
 
 type SangforCompletion struct {
-	cfg *config.ModelConfig
+	cfg    *config.ModelConfig
+	client *http.Client
 }
 
 func NewSangforCompletion(c *config.ModelConfig) LLM {
 	return &SangforCompletion{
 		cfg: c,
+		client: &http.Client{
+			Timeout: c.Timeout.Duration(),
+		},
 	}
 }
 
@@ -41,10 +45,7 @@ func (m *SangforCompletion) Completions(ctx context.Context, p *CompletionParame
 	req.Header.Set("Authorization", m.cfg.Authorization)
 
 	// 发送请求
-	client := &http.Client{
-		Timeout: m.cfg.Timeout.Duration(),
-	}
-	resp, err := client.Do(req)
+	resp, err := m.client.Do(req)
 	if err != nil {
 		status := StatusServerError
 		switch err {

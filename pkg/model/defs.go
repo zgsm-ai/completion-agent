@@ -25,10 +25,10 @@ type CompletionStatus string
 
 const (
 	StatusSuccess     CompletionStatus = "success"     //补全成功
+	StatusEmpty       CompletionStatus = "empty"       //补全结果为空
 	StatusReqError    CompletionStatus = "reqError"    //请求存在错误
 	StatusServerError CompletionStatus = "serverError" //服务端错误
 	StatusModelError  CompletionStatus = "modelError"  //模型响应错误
-	StatusEmpty       CompletionStatus = "empty"       //补全结果为空
 	StatusRejected    CompletionStatus = "rejected"    //根据规则拒绝补全
 	StatusTimeout     CompletionStatus = "timeout"     //补全请求超时
 	StatusCanceled    CompletionStatus = "canceled"    //用户取消
