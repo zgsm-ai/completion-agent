@@ -1,4 +1,4 @@
-name: Commit to Main Repository
+name: Commit Middles to Main Repository
 
 on:
   push:
@@ -6,8 +6,8 @@ on:
       - 'v*.*.*'
 
 jobs:
-  commit-to-main:
-    name: Commit to Main Repository
+  commit-middles-to-main:
+    name: Commit Middles to Main Repository
     runs-on: ubuntu-latest
     steps:
       - name: Checkout source repository (current repository)
